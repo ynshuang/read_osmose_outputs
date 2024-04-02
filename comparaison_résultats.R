@@ -9,30 +9,30 @@ library(viridis)
 library(RColorBrewer)
 
 ####### 1. série temporelle biomasse ######
-# chemin pour tous les résultats
-results_path <- c("calibration-03-13_1","calibration-03-19")
 
-# charger les données d'objectif pour la calibration
+# chemin pour tous les résultats
+results_path <- c("calibration-02-02","calibration-03-13_1","calibration-03-19")
+
+# Chargement des données d'objectif pour la calibration
 biomass_reference <- read.csv("Yansong_biomass-index_year.csv")
 
-# standardiser les colonnes des indices relatifs
-# séparer les espèces avec biomasse absolues et indices relatives
+# Séparation des espèces avec biomasse absolues et indices relatives
 biomass_colomns <- setdiff(names(biomass_reference),"year")
 biomass_absolute_species <- c("whiting","cod","sole","plaice","mackerel","herring")
 biomass_relative_species <- setdiff(biomass_colomns,biomass_absolute_species)
 
-# standardise les autres espèces
+# Transformation en format long
 biomass_reference_scaled <- biomass_reference
 biomass_reference_scaled[,biomass_relative_species] <- scale(biomass_reference[,biomass_relative_species])
 
-# transform en forme longue
+# Transformation en format long
 biomass_reference_long <- gather(biomass_reference_scaled, key = "species", value = "biomass_data", -year)
 
-# Charger les résultats de sortie du modèle
+# Chargement les résultats de sortie du modèle
 all_biomass <- list()
 
 # Boucler à travers les résultats de chaque modèle
-for (current_results_path in c(results_path)) {
+all_biomass <- lapply(results_path, function(current_results_path){
   # Charger les résultats de sortie du modèle
   list_biomass <- list.files(current_results_path, "Yansong_biomass_Simu.", full.names = TRUE)
   
@@ -75,11 +75,14 @@ for (current_results_path in c(results_path)) {
   # Supprimer les lignes en double
   biomass_comparison <- biomass_output_data[, -c(5, 6)]
   
-  # Ajouter le tableau à la liste
-  all_biomass[[length(all_biomass) + 1]] <- biomass_comparison
-}
+  return(biomass_comparison)
+}) 
 
-# Utiliser ggplot pour dessiner le graphique de comparaison, en regroupant les espèces dans le même graphique
+# Création du graphique de comparaison
+
+biomass_mean_colour_palette <- c("brown",brewer.pal(12, "Paired"))
+biomass_sd_colour_palette <- biomass_mean_colour_palette[c(3,5,7,9,11,13)]
+
 biomass_comparison_plot <- ggplot() +
   geom_point(data = all_biomass[[1]], aes(x = year, y = biomass_data, color = "observed data")) +
   geom_line(data = all_biomass[[1]], aes(x = year, y = biomass_output_mean, color = "mean model 1")) +
@@ -94,14 +97,20 @@ biomass_comparison_plot <- ggplot() +
                                                ymax = biomass_output_mean + biomass_output_sd,
                                                fill = "sd model 2"),
               alpha = 0.2) +
+  geom_line(data = all_biomass[[3]], aes(x = year, y = biomass_output_mean, color = "mean model 3")) +
+  geom_ribbon(data = all_biomass[[3]], aes(x = year,
+                                           ymin = biomass_output_mean - biomass_output_sd,
+                                           ymax = biomass_output_mean + biomass_output_sd,
+                                           fill = "sd model 3"),
+              alpha = 0.2) +
   scale_color_manual(name = element_blank(),
-                     values = c("observed data" = "darkred", "mean model 1" = "darkblue", "sd model 1" = "blue","mean model 2"="darkgreen","sd model 2"="lightgreen"),
-                     breaks = c("observed data", "mean model 1", "sd model 1","mean model 2","sd model 2"),
-                     labels = c("observed data", "mean model 1", "sd model 1", "mean model 2", "sd model 2")) +
+                     values = biomass_mean_colour_palette,
+                     breaks = c("observed data","mean model 1","sd model 1","mean model 2","sd model 2","mean model 3","sd model 3"),
+                     labels = c("observed data","mean model 1","sd model 1","mean model 2","sd model 2","mean model 3","sd model 3")) +
   scale_fill_manual(name = element_blank(),
-                    values = c("sd model 1" = "blue","sd model 2"="lightgreen"),
-                    breaks = c("sd model 1","sd model 2"),
-                    labels = c("sd model 1","sd model 2")) +
+                    values = biomass_sd_colour_palette,
+                    breaks = c("sd model 1","sd model 2","sd model 3"),
+                    labels = c("sd model 1","sd model 2","sd model 3")) +
   facet_wrap(~species, scales = "free_y", ncol = 4) +  # Specify ncol parameter as 4
   ylab("biomass (t)") +
   theme_bw() +
