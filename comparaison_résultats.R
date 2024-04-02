@@ -16,26 +16,6 @@ results_path <- "calibration-03-19"
 # charge les données d'objectif pour la calibration
 biomass_reference <- read.csv("Yansong_biomass-index_year.csv")
 
-###### biomasse absolue ######
-# biomass_colomns <- setdiff(names(biomass_reference),"year")
-# biomass_absolute_species <- c("whiting","cod","sole","plaice","mackerel","herring")
-# biomass_relative_species <- setdiff(biomass_colomns,biomass_absolute_species)
-# 
-# biomass_reference_absolute <- biomass_reference
-# biomass_reference_absolute[,2] <- biomass_reference[,2]*(21984/0.6)
-# biomass_reference_absolute[,3] <- biomass_reference[,3]*(5873/152)
-# biomass_reference_absolute[,4] <- biomass_reference[,4]*(23195/51163186)
-# biomass_reference_absolute[,6] <- biomass_reference[,6]*(8220/3818271)
-# biomass_reference_absolute[,8] <- biomass_reference[,8]*(22064/1560389.7)
-# biomass_reference_absolute[,11] <- biomass_reference[,11]*(130040/425)
-# biomass_reference_absolute[,14] <- NA
-# biomass_reference_absolute[,15] <- biomass_reference[,15]*(148672/47454903)
-# biomass_reference_absolute[,16] <- biomass_reference[,16]*(27224/5044497)
-# biomass_reference_absolute[,17] <- biomass_reference[,17]*(6000/0.22)
-# 
-# # transform en forme longue
-# biomass_reference_long <- gather(biomass_reference_absolute, key = "species", value = "biomass_data", -year)
-
 ###### tendance de biomasse ######
 # standardise les colonnes des indices relatifs
 # sépare les espèces avec biomasse absolues et indices relatives
@@ -594,33 +574,6 @@ biomass_by_age_2021_plot <- ggplot(biomass_by_age_2021_long) +
         legend.title = element_blank(),
         legend.position = c(0.7,0.04))
 ggsave(file.path("figures",results_path,"biomass_by_age_2021.png",sep=""), biomass_by_age_2021_plot, width = 10, height = 5, dpi=600)
-
-# biomass_by_age_path <- file.path(results_path,"Indicators/Yansong_biomassDistribByAge_Simu0.csv")
-# biomass_by_age <- read.csv(biomass_by_age_path, skip = 1)
-# 
-# # selectionner le premier pas de temps
-# biomass_by_age_initial <- biomass_by_age[1:26,-1]
-# 
-# # transformer en format long
-# biomass_by_age_initial_long <- tidyr::gather(biomass_by_age_initial, key = "species", value = "simulated", -Age)
-# 
-# # enlever les catégories de taille sans biomasse
-# biomass_by_age_initial_long <- dplyr::filter(biomass_by_age_initial_long, simulated > 0.1)
-# 
-# biomass_by_age_initial_plot <- ggplot(biomass_by_age_initial_long) + 
-#   geom_col(aes(x = Age, y = simulated), fill = "darkblue") + 
-#   facet_wrap(~species, scales = "free") +
-#   xlab("length (cm)") +
-#   ylab("biomass (t)") +
-#   ggtitle("Initial biomass distribution by age") + 
-#   theme_bw() +
-#   theme(axis.text.x = element_text(angle = 45, hjust = 1),
-#         plot.background = element_rect(fill = "white"),
-#         legend.margin = margin(0,1,0,1),
-#         legend.title = element_blank(),
-#         legend.position = c(0.7,0.04))
-# ggsave(file.path("figures",results_path,"biomass_by_age_initial.png",sep=""), biomass_by_age_initial_plot, width = 10, height = 5, dpi=600)
-# 
 
 ###### 5. Niveau trophique ######
 # 
