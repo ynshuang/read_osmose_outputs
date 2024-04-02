@@ -10,94 +10,107 @@ library(RColorBrewer)
 
 ####### 1. série temporelle biomasse ######
 # chemin pour tous les résultats
-results_path <- "calibration-03-19"
-
+results_path <- c("calibration-03-13_1","calibration-03-19")
 
 # charge les données d'objectif pour la calibration
 biomass_reference <- read.csv("Yansong_biomass-index_year.csv")
-
-###### tendance de biomasse ######
 # standardise les colonnes des indices relatifs
 # sépare les espèces avec biomasse absolues et indices relatives
 biomass_colomns <- setdiff(names(biomass_reference),"year")
 biomass_absolute_species <- c("whiting","cod","sole","plaice","mackerel","herring")
 biomass_relative_species <- setdiff(biomass_colomns,biomass_absolute_species)
-# standardise les autres espèces
 
+# standardise les autres espèces
 biomass_reference_scaled <- biomass_reference
 biomass_reference_scaled[,biomass_relative_species] <- scale(biomass_reference[,biomass_relative_species])
 
 # transform en forme longue
 biomass_reference_long <- gather(biomass_reference_scaled, key = "species", value = "biomass_data", -year)
 
-# sorties du modèle
-list_biomass <- list.files(results_path,"Yansong_biomass_Simu.",full.names = TRUE)
-
-# define a dataframe for the biomass of all species
-biomass_total <- data.frame(row.names = c("year","species","biomass_output_mean","biomass_output_sd"))
-
-biomass_total <- data.frame(
-  year = integer(),  
-  species = character(), 
-  biomass_output_mean = numeric(), 
-  biomass_output_sd = numeric()
-)
-
-for (species in 1:16){
-  biomass_species <- data.frame(
-    year=c(2002:2021),
-    species = rep("",20), 
-    stringsAsFactors = FALSE
+all_biomass <- list()
+# Loop through each model's output results
+for (results_path in c(results_path)) {
+  # Load the model output results
+  list_biomass <- list.files(results_path, "Yansong_biomass_Simu.", full.names = TRUE)
+  
+  # Create a new dataframe to store the biomass of all species
+  biomass_total <- data.frame(
+    year = integer(),
+    species = character(),
+    biomass_output_mean = numeric(),
+    biomass_output_sd = numeric()
   )
-  for (simulation in 1:10){
-    biomass_brut <- read.csv(list_biomass[simulation],skip = 1)
-    # standardise les colonnes des indices relatifs
-    biomass_brut_scaled <- biomass_brut
-    biomass_brut_scaled[,biomass_relative_species] <- scale(biomass_brut[,biomass_relative_species])
+  
+  # Loop through each species
+  for (species in 1:16) {
+    biomass_species <- data.frame(
+      year = c(2002:2021),
+      species = rep("", 20),
+      stringsAsFactors = FALSE
+    )
+    # Loop through each simulation
+    for (simulation in 1:10) {
+      biomass_brut <- read.csv(list_biomass[simulation], skip = 1)
+      biomass_brut_scaled <- biomass_brut
+      biomass_brut_scaled[, biomass_relative_species] <- scale(biomass_brut[, biomass_relative_species])
+      
+      biomass_species <- cbind(biomass_species, biomass = biomass_brut_scaled[, species + 1])
+    }
+    # Store species names
+    biomass_species$species[1:20] <- colnames(biomass_brut[species + 1])
     
-    biomass_species <- cbind(biomass_species, biomass = biomass_brut_scaled[,species+1])
+    # Calculate the mean and standard deviation of 10 simulation results
+    biomass_species$biomass_output_mean <- rowMeans(biomass_species[, 3:12])
+    biomass_species$biomass_output_sd <- apply(biomass_species[, 3:12], 1, sd)
+    
+    # Combine the biomass of all species
+    biomass_total <- rbind(biomass_total, biomass_species[, c(1, 2, 13, 14)])
   }
-  # put the species name in the column
-  biomass_species$species[1:20] <- colnames(biomass_brut[species+1])
   
-  # calculate mean and sd among 10 simulations
-  biomass_species$biomass_output_mean <- rowMeans(biomass_species[,3:12])
-  biomass_species$biomass_output_sd <- apply(biomass_species[,3:12],1,sd)
+  # Combine model outputs with observed data
+  biomass_output_data <- cbind(biomass_total, biomass_reference_long)
+  # Remove duplicate rows
+  biomass_comparison <- biomass_output_data[, -c(5, 6)]
   
-  # regroup the biomass of all species
-  biomass_total <- rbind(biomass_total,biomass_species[,c(1,2,13,14)])
+  # Add the table to the list
+  all_biomass[[length(all_biomass) + 1]] <- biomass_comparison
 }
 
-# regroup the model outputs with observed data
-biomass_output_data <- cbind(biomass_total,biomass_reference_long) 
-# delete repeated rows
-biomass_comparison <- biomass_output_data[,-c(5,6)]
+biomass_comparison_1 <- data.frame(all_biomass[1])
+biomass_comparison_2 <- data.frame(all_biomass[2])
 
-library(ggplot2)
-biomass_comparison_plot <- ggplot(data=biomass_comparison)+
-  geom_point(aes(x=year, y=biomass_data, color="darkred"))+
-  geom_line(aes(x=year, y = biomass_output_mean, color="darkblue"))+
-  geom_ribbon(aes(x=year,
+# Use ggplot to draw the comparison graph, grouping species in the same graph
+plot <- ggplot() +
+  geom_point(data = biomass_comparison_1, aes(x = year, y = biomass_data, color = "darkred")) +
+  geom_line(data = biomass_comparison_1, aes(x = year, y = biomass_output_mean, color = "darkblue")) +
+  geom_ribbon(data = biomass_comparison_1, aes(x = year,
                   ymin = biomass_output_mean - biomass_output_sd,
                   ymax = biomass_output_mean + biomass_output_sd,
-                  fill="blue"),
+                  fill = "blue"),
+              alpha = 0.2) +
+  geom_line(data = biomass_comparison_2, aes(x = year, y = biomass_output_mean, color = "darkgreen")) +
+  geom_ribbon(data = biomass_comparison_2, aes(x = year,
+                                         ymin = biomass_output_mean - biomass_output_sd,
+                                         ymax = biomass_output_mean + biomass_output_sd,
+                                         fill = "lightgreen"),
               alpha = 0.2) +
   scale_color_manual(name = element_blank(),
-                     values = c("darkred" = "darkred", "darkblue" = "darkblue","blue"="blue"),
-                     breaks = c("darkred", "darkblue","blue"),
-                     labels = c("observed data", "mean model outputs", "sd model outputs"))+
+                     values = c("darkred" = "darkred", "darkblue" = "darkblue", "blue" = "blue","darkgreen"="darkgreen","lightgreen"="lightgreen"),
+                     breaks = c("darkred", "darkblue", "blue","darkgreen","lightgreen"),
+                     labels = c("observed data", "mean model 1", "sd model 1", "mean model 2", "sd model 2")) +
   scale_fill_manual(name = element_blank(),
-                    values = c("blue"="blue"),
-                    breaks = c("blue"),
-                    labels = c("sd model outputs"))+
-  facet_wrap(~species, scales = "free_y") +
-  ylab("biomass (t)")+
-  theme_bw()+
+                    values = c("blue" = "blue","lightgreen"="lightgreen"),
+                    breaks = c("blue","lightgreen"),
+                    labels = c("sd model 1","sd model 2")) +
+  facet_wrap(~species, scales = "free_y", ncol = 4) +  # Specify ncol parameter as 4
+  ylab("biomass (t)") +
+  theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1),
         plot.background = element_rect(fill = "white"),
         legend.title = element_blank())
 
-ggsave(file.path("figures",results_path,"biomass_indices.png",sep=""),biomass_comparison_plot, width = 10, height = 5, dpi=600)
+# Save the comparison graph
+ggsave(file.path("figures", "biomass_indices_test.png"), biomass_comparison_plot, width = 15, height = 8, dpi = 600)
 
 ####### 2. série temporelle capture ######
 
