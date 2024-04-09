@@ -7,16 +7,14 @@ library(tidyr)
 library(dplyr)
 library(viridis)
 library(RColorBrewer)
+library(gridExtra)
+# chemin pour tous les résultats
+results_path <- "test-04-09"
 
 ####### 1. série temporelle biomasse ######
-# chemin pour tous les résultats
-results_path <- "calibration-03-25_c"
-
-
 # charge les données d'objectif pour la calibration
 biomass_reference <- read.csv("Yansong_biomass-index_year.csv")
 
-###### tendance de biomasse ######
 # standardise les colonnes des indices relatifs
 # sépare les espèces avec biomasse absolues et indices relatives
 biomass_colomns <- setdiff(names(biomass_reference),"year")
@@ -142,9 +140,6 @@ yield_output_data <- merge(yield_total,yield_data_long,by=c("year","species"))
 # delete the species non-exploited
 yield_output_data <- yield_output_data %>%
   dplyr::filter(!(species %in% c("poorCod","dragonet")))
-
-library(ggplot2)
-library(gridExtra)
 
 yield_comparison_plot <- ggplot(data=yield_output_data)+
   geom_line(aes(x=year, y=yield_data, color = "darkred"))+
@@ -602,7 +597,7 @@ ggsave(file.path("figures",results_path,"biomass_by_age_2021.png",sep=""), bioma
 ###### 6. Mortalités ######
 # before running the code, add a word to the empty cell in each table, to prevent having ',' at the end of each line
 mortality_path <- file.path(results_path,"Mortality")
-list_mortality <- list.files(mortality_path,"Yansong_mortalityRate.*Simu8.",full.names = TRUE)
+list_mortality <- list.files(mortality_path,"Yansong_mortalityRate.*Simu0.",full.names = TRUE)
 species_name <- stringr::str_match(list_mortality, "mortalityRate-(.*?)(?=_Simu)")[,2]
 
 for(species in 1:16){
@@ -669,7 +664,7 @@ ggsave(file.path("figures",results_path,"diet.png"), diet_plot, width = 10, heig
 
 ###### 7.2 Predation pressure ######
 # load data
-predation_path <- file.path(results_path,"/Trophic/Yansong_predatorPressure_Simu8.csv")
+predation_path <- file.path(results_path,"/Trophic/Yansong_predatorPressure_Simu0.csv")
 pred_pressure_example <- readr::read_csv(predation_path, skip = 1)
 # transform to long format
 pred_pressure_example_long <- pred_pressure_example %>%

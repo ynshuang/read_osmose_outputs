@@ -9,7 +9,7 @@ library(viridis)
 library(RColorBrewer)
 
 # chemin pour tous les résultats
-results_path <- c("calibration-02-02","calibration-03-19","calibration-03-25_b")
+results_path <- c("calibration-02-02","calibration-03-19","calibration-03-25_a","calibration-03-25_c")
 
 ####### 1. série temporelle biomasse ######
 
@@ -103,14 +103,20 @@ biomass_comparison_plot <- ggplot() +
                                            ymax = biomass_output_mean + biomass_output_sd,
                                            fill = "sd model 3"),
               alpha = 0.2) +
+  geom_line(data = all_biomass[[4]], aes(x = year, y = biomass_output_mean, color = "mean model 4")) +
+  geom_ribbon(data = all_biomass[[4]], aes(x = year,
+                                           ymin = biomass_output_mean - biomass_output_sd,
+                                           ymax = biomass_output_mean + biomass_output_sd,
+                                           fill = "sd model 4"),
+              alpha = 0.2) +
   scale_color_manual(name = element_blank(),
                      values = biomass_mean_colour_palette,
-                     breaks = c("observed data","mean model 1","sd model 1","mean model 2","sd model 2","mean model 3","sd model 3"),
-                     labels = c("observed data","mean model 1","sd model 1","mean model 2","sd model 2","mean model 3","sd model 3")) +
+                     breaks = c("observed data","mean model 1","sd model 1","mean model 2","sd model 2","mean model 3","sd model 3","mean model 4","sd model 4"),
+                     labels = c("observed data","02/02","02/02","19/13","19/13","25/03 a","25/03 a","25/03 c","25/03 c")) +
   scale_fill_manual(name = element_blank(),
                     values = biomass_sd_colour_palette,
-                    breaks = c("sd model 1","sd model 2","sd model 3"),
-                    labels = c("sd model 1","sd model 2","sd model 3")) +
+                    breaks = c("sd model 1","sd model 2","sd model 3","sd model 4"),
+                    labels = c("02/02","19/03","25/03 a","25/03 c")) +
   facet_wrap(~species, scales = "free_y", ncol = 4) +  # Specify ncol parameter as 4
   ylab("biomass (t)") +
   theme_bw() +
@@ -119,7 +125,7 @@ biomass_comparison_plot <- ggplot() +
         legend.title = element_blank())
 
 # Sauvegarder le graphique de comparaison
-ggsave(file.path("figures", results_path[3], "biomass_indices.png", sep=""), biomass_comparison_plot, width = 15, height = 8, dpi = 600)
+ggsave(file.path("figures", results_path[3], "biomass_indices_multiple_models_2.png", sep=""), biomass_comparison_plot, width = 15, height = 8, dpi = 600)
 
 ####### 2. série temporelle capture ######
 
@@ -202,14 +208,20 @@ yield_comparison_plot <- ggplot() +
                                          ymax = yield_output_mean + yield_output_sd,
                                          fill = "sd model 3"),
               alpha = 0.2) +
+  geom_line(data = all_yield[[4]], aes(x = year, y = yield_output_mean, color = "mean model 4")) +
+  geom_ribbon(data = all_yield[[4]], aes(x = year,
+                                         ymin = yield_output_mean - yield_output_sd,
+                                         ymax = yield_output_mean + yield_output_sd,
+                                         fill = "sd model 4"),
+              alpha = 0.2) +
   scale_color_manual(name = element_blank(),
                      values = yield_mean_colour_palette,
-                     breaks = c("observed data","mean model 1","sd model 1","mean model 2","sd model 2","mean model 3","sd model 3"),
-                     labels = c("observed data","mean model 1","sd model 1","mean model 2","sd model 2","mean model 3","sd model 3")) +
+                     breaks = c("observed data","mean model 1","sd model 1","mean model 2","sd model 2","mean model 3","sd model 3","mean model 4","sd model 4"),
+                     labels = c("observed data","02/02","02/02","19/13","19/13","25/03 a","25/03 a","25/03 c","25/03 c")) +
   scale_fill_manual(name = element_blank(),
                     values = yield_sd_colour_palette,
-                    breaks = c("sd model 1","sd model 2","sd model 3"),
-                    labels = c("sd model 1","sd model 2","sd model 3")) +
+                    breaks = c("sd model 1","sd model 2","sd model 3","sd model 4"),
+                    labels = c("02/02","19/03","25/03 a","25/03 c")) +
   facet_wrap(~species, scales = "free_y", ncol = 4) +  # Specify ncol parameter as 4
   ylab("yield (t)") +
   theme_bw() +
@@ -217,4 +229,67 @@ yield_comparison_plot <- ggplot() +
         plot.background = element_rect(fill = "white"),
         legend.title = element_blank())
 
-ggsave(file.path("figures",results_path[3],"yield.png",sep=""), yield_comparison_plot, width = 10, height = 5, dpi=600)
+ggsave(file.path("figures",results_path[3],"yield_multiple_models_2.png",sep=""), yield_comparison_plot, width = 10, height = 5, dpi=600)
+
+###### 3. Taille moyenne de capture ######
+
+# list_catch_at_length_path <- list.files(results_path[2],"SizeIndicators/Yansong_yieldNDistribBySize_Simu.",full.names = TRUE)
+
+# list_catch_at_length_path <- list.files("calibration-03-19/SizeIndicators/","Yansong_yieldNDistribBySize_Simu.",full.names = TRUE)
+# 
+# mean_catch_size_total <- data.frame()
+# 
+# for(simulation in  1:10){
+#   catch_at_length_brut <- read.csv(list_catch_at_length_path[simulation], skip = 1)
+#   catch_at_length_long <- tidyr::gather(catch_at_length_brut, key = "species", value = "simulated", -c(Time,Size))
+#   catch_at_length_long <- dplyr::filter(catch_at_length_long, simulated > 0.1)
+#   mean_catch_size <- catch_at_length_long %>%
+#     mutate(year=Time+2001) %>%
+#     select(-Time) %>%
+#     group_by(year,species) %>%
+#     summarise(simulated = weighted.mean(Size, w=simulated))
+#   
+#   if (simulation == 1)
+#     mean_catch_size_total <- mean_catch_size
+#   else
+#     mean_catch_size_total <- cbind(mean_catch_size_total,mean_catch_size$simulated)
+# }
+# 
+# mean_catch_size_total$simulated_mean <- rowMeans(mean_catch_size_total[,3:12])
+# mean_catch_size_total$simulated_sd <- apply(mean_catch_size_total[,3:12],1,sd)
+# 
+# # charge les données observées
+# observed_mean_catch_size <- readRDS("observed_mean_catch_size_by_years_SACROIS_20240109.rds") 
+# observed_mean_catch_size <- observed_mean_catch_size %>%
+#   rename(species=spp)
+# 
+# mean_catch_size_comparison <- mean_catch_size_total %>%
+#   select(c("year","species","simulated_mean","simulated_sd")) %>%
+#   left_join(observed_mean_catch_size, by=c("year","species"))
+# 
+# mean_catch_size_plot <- ggplot(mean_catch_size_comparison) +
+#   geom_point(aes(x=year,y=observed,color = "darkred"))+
+#   geom_line(aes(x=year,y=simulated_mean, color = "darkblue")) +
+#   geom_ribbon(data = mean_catch_size_comparison, aes(x = year,
+#                                          ymin = simulated_mean - simulated_sd,
+#                                          ymax = simulated_mean + simulated_sd,
+#                                          fill = "sd model"),
+#               alpha = 0.2) +
+#   facet_wrap(~species,scales = "free")+
+#   scale_color_manual(name = element_blank(),
+#                      values = c("darkred" = "darkred", "darkblue" = "darkblue","sd model"="blue" ),
+#                      breaks = c("darkred", "darkblue","sd model"),
+#                      labels = c("observed data", "mean model", "sd model"))+
+#   scale_fill_manual(name = element_blank(),
+#                     values = c("sd model"="blue"),
+#                     breaks = c("sd model"),
+#                     labels = c("sd model"))+
+#   ylab("mean catch length (cm)")+
+#   theme_bw()+
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1),
+#         plot.background = element_rect(fill = "white"),
+#         legend.margin = margin(0,1,0,1),
+#         legend.title = element_blank(),
+#         legend.position = c(0.7,0.04))
+# 
+# ggsave(file.path("figures",results_path[3],"mean_catch_size.png"), mean_catch_size_plot, width = 10, height = 5, dpi=600)
