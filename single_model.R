@@ -9,9 +9,10 @@ library(viridis)
 library(RColorBrewer)
 library(gridExtra)
 # chemin pour tous les résultats
-results_path <- "test-04-09"
+results_path <- "calibration-04-17_d"
+replication_number <- 10
 
-####### 1. série temporelle biomasse ######
+###### 1. série temporelle biomasse ######
 # charge les données d'objectif pour la calibration
 biomass_reference <- read.csv("Yansong_biomass-index_year.csv")
 
@@ -28,7 +29,8 @@ biomass_reference_scaled[,biomass_relative_species] <- scale(biomass_reference[,
 # transform en forme longue
 biomass_reference_long <- gather(biomass_reference_scaled, key = "species", value = "biomass_data", -year)
 
-# sorties du modèle
+if (replication_number == 10)
+{ # sorties du modèle
 list_biomass <- list.files(results_path,"Yansong_biomass_Simu.",full.names = TRUE)
 
 # define a dataframe for the biomass of all species
@@ -96,14 +98,73 @@ biomass_comparison_plot <- ggplot(data=biomass_comparison)+
         legend.title = element_blank())
 
 ggsave(file.path("figures",results_path,"biomass_indices.png",sep=""),biomass_comparison_plot, width = 10, height = 5, dpi=600)
+} else if(replication_number==1)
+{
+  biomass_file <- file.path(results_path,"Yansong_biomass_Simu0.csv")
+  
+  # define a dataframe for the biomass of all species
+  biomass_total <- data.frame(row.names = c("year","species","biomass"))
+  
+  biomass_total <- data.frame(
+    year = integer(),  
+    species = character(), 
+    biomass = numeric()
+  )
+  
+  for (species in 1:16){
+    biomass_species <- data.frame(
+      year=c(2002:2021),
+      species = rep("",20), 
+      biomass = rep(NA,20),
+      stringsAsFactors = FALSE
+    )
 
-####### 2. série temporelle capture ######
+      biomass_brut <- read.csv(biomass_file, skip=1)
+      # standardise les colonnes des indices relatifs
+      biomass_brut_scaled <- biomass_brut
+      biomass_brut_scaled[,biomass_relative_species] <- scale(biomass_brut[,biomass_relative_species])
+      biomass_species$biomass <- biomass_brut_scaled[,species+1]
+
+    # put the species name in the column
+    biomass_species$species[1:20] <- colnames(biomass_brut[species+1])
+    
+    # regroup the biomass of all species
+    biomass_total <- rbind(biomass_total,biomass_species)
+  }
+  
+  # regroup the model outputs with observed data
+  biomass_output_data <- cbind(biomass_total,biomass_reference_long) 
+  # delete repeated rows
+  biomass_comparison <- biomass_output_data[,-c(4,5)]
+  
+  biomass_comparison_plot <- ggplot(data=biomass_comparison)+
+    geom_point(aes(x=year, y=biomass_data, color="darkred"))+
+    geom_line(aes(x=year, y=biomass, color="darkblue"))+
+    scale_color_manual(name = element_blank(),
+                       values = c("darkred" = "darkred", "darkblue" = "darkblue"),
+                       breaks = c("darkred", "darkblue"),
+                       labels = c("observed data", "model outputs"))+
+    facet_wrap(~species, scales = "free_y") +
+    ylab("biomass (t)")+
+    theme_bw()+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          plot.background = element_rect(fill = "white"),
+          legend.title = element_blank())
+  
+  ggsave(file.path("figures",results_path,"biomass_indices.png",sep=""),biomass_comparison_plot, width = 10, height = 5, dpi=600)
+  
+} else {
+  print("en cours...")
+}
+
+###### 2. série temporelle capture ######
 
 # données
 yield_data <- read.csv("Yansong_yield_year.csv")
 yield_data_long <- gather(yield_data, key = "species", value = "yield_data", -year)
 
-# sorties du modèle
+if(replication_number==10)
+{# sorties du modèle
 list_yield <- list.files(results_path,"Yansong_yield_Simu.",full.names = TRUE)
 
 # define a dataframe for the yield of all species
@@ -167,9 +228,66 @@ yield_comparison_plot <- ggplot(data=yield_output_data)+
         legend.position = c(0.7,0.04))
 
 ggsave(file.path("figures",results_path,"yield.png",sep=""), yield_comparison_plot, width = 10, height = 5, dpi=600)
+} else if (replication_number==1){
+  yield_file <- file.path(results_path,"Yansong_yield_Simu0.csv")
+  
+  # define a dataframe for the yield of all species
+  yield_total <- data.frame(row.names = c("year","species","yield"))
+  
+  yield_total <- data.frame(
+    year = integer(),  
+    species = character(), 
+    yield = numeric()
+  )
+  
+  for (species in 1:16){
+    yield_species <- data.frame(
+      year=c(2002:2021),
+      species = rep("",20), 
+      yield = rep(NA,20),
+      stringsAsFactors = FALSE
+    )
+    
+    yield_brut <- read.csv(yield_file, skip=1)
+    yield_species$yield <- yield_brut[,species+1]
+    
+    # put the species name in the column
+    yield_species$species[1:20] <- colnames(yield_brut[species+1])
+    
+    # regroup the yield of all species
+    yield_total <- rbind(yield_total,yield_species)
+  }
+  
+  # regroup the model outputs with observed data
+  yield_output_data <- cbind(yield_total,yield_data_long) 
+  # delete repeated rows
+  yield_comparison <- yield_output_data[,-c(4,5)]
+  # delete the species non-exploited
+  yield_comparison <- yield_comparison %>%
+    dplyr::filter(!(species %in% c("poorCod","dragonet")))
+  
+  yield_comparison_plot <- ggplot(data=yield_comparison)+
+    geom_point(aes(x=year, y=yield_data, color="darkred"))+
+    geom_line(aes(x=year, y=yield, color="darkblue"))+
+    scale_color_manual(name = element_blank(),
+                       values = c("darkred" = "darkred", "darkblue" = "darkblue"),
+                       breaks = c("darkred", "darkblue"),
+                       labels = c("observed data", "model outputs"))+
+    facet_wrap(~species, scales = "free_y") +
+    ylab("yield (t)")+
+    theme_bw()+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          plot.background = element_rect(fill = "white"),
+          legend.title = element_blank())
+  
+  ggsave(file.path("figures",results_path,"yield.png",sep=""),yield_comparison_plot, width = 10, height = 5, dpi=600)
+  
+} else {
+  print("en cours...")
+}
 
-####### 3. Validation de courbe de croissance ######
-growth_path <- file.path(results_path,"AgeIndicators/Yansong_meanSizeDistribByAge_Simu1.csv")
+###### 3. Validation de courbe de croissance ######
+growth_path <- file.path(results_path,"AgeIndicators/Yansong_meanSizeDistribByAge_Simu0.csv")
 growth_example <- read.csv(growth_path,skip = 1)
 
 # définir le fonction de croissance Von Bertalanffy
@@ -413,12 +531,13 @@ catch_at_length_2021_plot <- ggplot(catch_at_length_2021_long) +
 ggsave(file.path("figures",results_path,"catch_at_length_2021.png",sep=""), catch_at_length_2021_plot, width = 10, height = 5, dpi=600)
 
 ###### 4.2 série temporelle de taille moyenne des captures #######
+
 # calculer la taille moyenne pondérée
 mean_catch_size <- catch_at_length_long %>%
   mutate(year=Time+2001) %>%
   select(-Time) %>%
   group_by(year,species) %>%
-  summarise(simulated = weighted.mean(Size, w=simulated))
+  summarise(simulated = weighted.mean(Size, w=simulated)+2.5) # +2.5 car la taille indiquée est la limite minimale de la gamme de taille
 
 # charge les données observées
 observed_mean_catch_size <- readRDS("observed_mean_catch_size_by_years_SACROIS_20240109.rds") 
@@ -446,7 +565,7 @@ mean_catch_size_plot <- ggplot(mean_catch_size) +
 
 ggsave(file.path("figures",results_path,"mean_catch_size.png"), mean_catch_size_plot, width = 10, height = 5, dpi=600)
 
-####### 4.3 biomass distribution by size #######
+###### 4.3 biomass distribution by size #######
 biomass_by_size_path <- file.path(results_path,"Indicators/Yansong_biomassDistribBySize_Simu0.csv")
 biomass_by_size <- read.csv(biomass_by_size_path, skip = 1)
 
@@ -508,7 +627,7 @@ biomass_by_size_2021_plot <- ggplot(biomass_by_size_2021_long) +
         legend.position = c(0.7,0.04))
 ggsave(file.path("figures",results_path,"biomass_by_size_2021.png",sep=""), biomass_by_size_2021_plot, width = 10, height = 5, dpi=600)
 
-####### 4.4 biomass distribution by age #######
+###### 4.4 biomass distribution by age #######
 biomass_by_age_path <- file.path(results_path,"Indicators/Yansong_biomassDistribByAge_Simu0.csv")
 biomass_by_age <- read.csv(biomass_by_age_path, skip = 1)
 
