@@ -9,7 +9,7 @@ library(viridis)
 library(RColorBrewer)
 
 # chemin pour tous les résultats
-results_path <- c("calibration-02-02","calibration-03-19","calibration-03-25_a","calibration-03-25_c")
+results_path <- c("calibration-02-02","calibration-04-17_a","calibration-04-17_c","calibration-04-17_d")
 
 ####### 1. série temporelle biomasse ######
 
@@ -232,4 +232,89 @@ yield_comparison_plot <- ggplot() +
 ggsave(file.path("figures",results_path[3],"yield_multiple_models_2.png",sep=""), yield_comparison_plot, width = 10, height = 5, dpi=600)
 
 ###### 3. Taille moyenne de capture ######
+# créer un list
+all_catch_at_length <- list()
 
+# Boucler à travers les résultats de chaque modèle
+all_catch_at_length <- lapply(results_path, function(current_results_path){
+  # Charger les résultats de sortie du modèle
+  catch_at_length_list <- list.files(paste(current_results_path, "/SizeIndicators/",sep=""), "Yansong_yieldNDistribBySize_Simu.", full.names = TRUE)
+  
+  for(simulation in  1:10){
+    catch_at_length_brut <- read.csv(catch_at_length_list[simulation], skip = 1)
+    catch_at_length_long <- tidyr::gather(catch_at_length_brut, key = "species", value = "simulated", -c(Time,Size))
+    catch_at_length_long <- dplyr::filter(catch_at_length_long, simulated > 0.1)
+    mean_catch_size <- catch_at_length_long %>%
+      mutate(year=Time+2001) %>%
+      select(-Time) %>%
+      group_by(year,species) %>%
+      summarise(simulated = weighted.mean(Size, w=simulated))
+    
+    if (simulation == 1)
+      mean_catch_size_total <- mean_catch_size
+    else
+      mean_catch_size_total <- cbind(mean_catch_size_total,mean_catch_size$simulated)
+  }
+  
+  mean_catch_size_total$simulated_mean <- rowMeans(mean_catch_size_total[,3:12])
+  mean_catch_size_total$simulated_sd <- apply(mean_catch_size_total[,3:12],1,sd)
+  
+  # charge les données observées
+  observed_mean_catch_size <- readRDS("observed_mean_catch_size_by_years_SACROIS_20240109.rds")
+  observed_mean_catch_size <- observed_mean_catch_size %>%
+    rename(species=spp)
+  
+  mean_catch_size_comparison <- mean_catch_size_total %>%
+    select(c("year","species","simulated_mean","simulated_sd")) %>%
+    left_join(observed_mean_catch_size, by=c("year","species"))
+  
+  return(mean_catch_size_comparison)
+}) 
+
+# Création du graphique de comparaison
+
+catch_at_length_mean_colour_palette <- c("brown",brewer.pal(12, "Paired"))
+catch_at_length_sd_colour_palette <- catch_at_length_mean_colour_palette[c(3,5,7,9,11,13)]
+
+catch_at_length_comparison_plot <- ggplot() +
+  geom_point(data = all_catch_at_length[[1]], aes(x = year, y = observed, color = "observed data")) +
+  geom_line(data = all_catch_at_length[[1]], aes(x = year, y = simulated_mean, color = "mean model 1")) +
+  geom_ribbon(data = all_catch_at_length[[1]], aes(x = year,
+                                                   ymin = simulated_mean - simulated_sd,
+                                                   ymax = simulated_mean + simulated_sd,
+                                                   fill = "sd model 1"),
+              alpha = 0.2) +
+  geom_line(data = all_catch_at_length[[2]], aes(x = year, y = simulated_mean, color = "mean model 2")) +
+  geom_ribbon(data = all_catch_at_length[[2]], aes(x = year,
+                                                   ymin = simulated_mean - simulated_sd,
+                                                   ymax = simulated_mean + simulated_sd,
+                                                   fill = "sd model 2"),
+              alpha = 0.2) +
+  geom_line(data = all_catch_at_length[[3]], aes(x = year, y = simulated_mean, color = "mean model 3")) +
+  geom_ribbon(data = all_catch_at_length[[3]], aes(x = year,
+                                                   ymin = simulated_mean - simulated_sd,
+                                                   ymax = simulated_mean + simulated_sd,
+                                                   fill = "sd model 3"),
+              alpha = 0.2) +
+  geom_line(data = all_catch_at_length[[4]], aes(x = year, y = simulated_mean, color = "mean model 4")) +
+  geom_ribbon(data = all_catch_at_length[[4]], aes(x = year,
+                                                   ymin = simulated_mean - simulated_sd,
+                                                   ymax = simulated_mean + simulated_sd,
+                                                   fill = "sd model 4"),
+              alpha = 0.2) +
+  scale_color_manual(name = element_blank(),
+                     values = catch_at_length_mean_colour_palette,
+                     breaks = c("observed data","mean model 1","sd model 1","mean model 2","sd model 2","mean model 3","sd model 3","mean model 4","sd model 4"),
+                     labels = c("observed data","mean model 1","sd model 1","mean model 2","sd model 2","mean model 3","sd model 3","mean model 4","sd model 4")) +
+  scale_fill_manual(name = element_blank(),
+                    values = catch_at_length_sd_colour_palette,
+                    breaks = c("sd model 1","sd model 2","sd model 3","sd model 4"),
+                    labels = c("sd model 1","sd model 2","sd model 3","sd model 4")) +
+  facet_wrap(~species, scales = "free_y", ncol = 4) +  # Specify ncol parameter as 4
+  ylab("catch_at_length (t)") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.background = element_rect(fill = "white"),
+        legend.title = element_blank())
+
+ggsave(file.path("figures",results_path[2],"catch_at_length_multiple_models.png",sep=""), catch_at_length_comparison_plot, width = 10, height = 5, dpi=600)
