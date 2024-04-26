@@ -9,7 +9,7 @@ library(viridis)
 library(RColorBrewer)
 library(gridExtra)
 # chemin pour tous les résultats
-results_path <- "calibration-04-17_d"
+results_path <- "calibration-04-17_c"
 replication_number <- 10
 
 ###### 1. série temporelle biomasse ######
@@ -532,29 +532,55 @@ ggsave(file.path("figures",results_path,"catch_at_length_2021.png",sep=""), catc
 
 ###### 4.2 série temporelle de taille moyenne des captures #######
 
-# calculer la taille moyenne pondérée
-mean_catch_size <- catch_at_length_long %>%
-  mutate(year=Time+2001) %>%
-  select(-Time) %>%
-  group_by(year,species) %>%
-  summarise(simulated = weighted.mean(Size, w=simulated)+2.5) # +2.5 car la taille indiquée est la limite minimale de la gamme de taille
+catch_at_length_list <- list.files(paste(results_path, "/SizeIndicators/",sep=""),"Yansong_yieldNDistribBySize_Simu.", full.names = TRUE)
+
+mean_catch_size_total <- data.frame()
+
+for(simulation in  1:10){
+  catch_at_length_brut <- read.csv(catch_at_length_list[simulation], skip = 1)
+  catch_at_length_long <- tidyr::gather(catch_at_length_brut, key = "species", value = "simulated", -c(Time,Size))
+  catch_at_length_long <- dplyr::filter(catch_at_length_long, simulated > 0.1)
+  mean_catch_size <- catch_at_length_long %>%
+    mutate(year=Time+2001) %>%
+    select(-Time) %>%
+    group_by(year,species) %>%
+    summarise(simulated = weighted.mean(Size, w=simulated))
+  
+  if (simulation == 1)
+    mean_catch_size_total <- mean_catch_size
+  else
+    mean_catch_size_total <- cbind(mean_catch_size_total,mean_catch_size$simulated)
+}
+
+mean_catch_size_total$simulated_mean <- rowMeans(mean_catch_size_total[,3:12])
+mean_catch_size_total$simulated_sd <- apply(mean_catch_size_total[,3:12],1,sd)
 
 # charge les données observées
-observed_mean_catch_size <- readRDS("observed_mean_catch_size_by_years_SACROIS_20240109.rds") 
+observed_mean_catch_size <- readRDS("observed_mean_catch_size_by_years_SACROIS_20240109.rds")
 observed_mean_catch_size <- observed_mean_catch_size %>%
   rename(species=spp)
 
-mean_catch_size <- mean_catch_size %>%
+mean_catch_size_comparison <- mean_catch_size_total %>%
+  select(c("year","species","simulated_mean","simulated_sd")) %>%
   left_join(observed_mean_catch_size, by=c("year","species"))
 
-mean_catch_size_plot <- ggplot(mean_catch_size) +
-  geom_line(aes(x=year,y=simulated, color = "darkblue")) +
+mean_catch_size_plot <- ggplot(mean_catch_size_comparison) +
   geom_point(aes(x=year,y=observed,color = "darkred"))+
+  geom_line(aes(x=year,y=simulated_mean, color = "darkblue")) +
+  geom_ribbon(data = mean_catch_size_comparison, aes(x = year,
+                                                     ymin = simulated_mean - simulated_sd,
+                                                     ymax = simulated_mean + simulated_sd,
+                                                     fill = "sd model"),
+              alpha = 0.2) +
   facet_wrap(~species,scales = "free")+
   scale_color_manual(name = element_blank(),
-                     values = c("darkred" = "darkred", "darkblue" = "darkblue"),
-                     breaks = c("darkred", "darkblue"),
-                     labels = c("observed data", "model outputs"))+
+                     values = c("darkred" = "darkred", "darkblue" = "darkblue","sd model"="blue" ),
+                     breaks = c("darkred", "darkblue","sd model"),
+                     labels = c("observed data", "mean model", "sd model"))+
+  scale_fill_manual(name = element_blank(),
+                    values = c("sd model"="blue"),
+                    breaks = c("sd model"),
+                    labels = c("sd model"))+
   ylab("mean catch length (cm)")+
   theme_bw()+
   theme(axis.text.x = element_text(angle = 45, hjust = 1),
@@ -564,6 +590,7 @@ mean_catch_size_plot <- ggplot(mean_catch_size) +
         legend.position = c(0.7,0.04))
 
 ggsave(file.path("figures",results_path,"mean_catch_size.png"), mean_catch_size_plot, width = 10, height = 5, dpi=600)
+
 
 ###### 4.3 biomass distribution by size #######
 biomass_by_size_path <- file.path(results_path,"Indicators/Yansong_biomassDistribBySize_Simu0.csv")
