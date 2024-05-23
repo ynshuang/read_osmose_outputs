@@ -9,7 +9,7 @@ library(viridis)
 library(RColorBrewer)
 library(gridExtra)
 # chemin pour tous les résultats
-results_path <- "calibration-04-17_c"
+results_path <- "calibration-05-12"
 replication_number <- 10
 
 ###### 1. série temporelle biomasse ######

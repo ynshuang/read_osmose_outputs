@@ -9,7 +9,7 @@ library(viridis)
 library(RColorBrewer)
 
 # chemin pour tous les résultats
-results_path <- c("calibration-02-02","calibration-04-17_a","calibration-04-17_c","calibration-04-17_d")
+results_path <- c("calibration-04-17_a","calibration-04-17_b","calibration-04-17_c","calibration-04-17_d")
 
 ####### 1. série temporelle biomasse ######
 
@@ -112,11 +112,11 @@ biomass_comparison_plot <- ggplot() +
   scale_color_manual(name = element_blank(),
                      values = biomass_mean_colour_palette,
                      breaks = c("observed data","mean model 1","sd model 1","mean model 2","sd model 2","mean model 3","sd model 3","mean model 4","sd model 4"),
-                     labels = c("observed data","02/02","02/02","19/13","19/13","25/03 a","25/03 a","25/03 c","25/03 c")) +
+                     labels = c("observed data","mean model 1","sd model 1","mean model 2","sd model 2","mean model 3","sd model 3","mean model 4","sd model 4")) +
   scale_fill_manual(name = element_blank(),
                     values = biomass_sd_colour_palette,
                     breaks = c("sd model 1","sd model 2","sd model 3","sd model 4"),
-                    labels = c("02/02","19/03","25/03 a","25/03 c")) +
+                    labels = c("sd model 1","sd model 2","sd model 3","sd model 4")) +
   facet_wrap(~species, scales = "free_y", ncol = 4) +  # Specify ncol parameter as 4
   ylab("biomass (t)") +
   theme_bw() +
@@ -125,7 +125,7 @@ biomass_comparison_plot <- ggplot() +
         legend.title = element_blank())
 
 # Sauvegarder le graphique de comparaison
-ggsave(file.path("figures", results_path[3], "biomass_indices_multiple_models_2.png", sep=""), biomass_comparison_plot, width = 15, height = 8, dpi = 600)
+ggsave(file.path("figures", results_path[2], "biomass_indices_multiple_models.png", sep=""), biomass_comparison_plot, width = 15, height = 8, dpi = 600)
 
 ####### 2. série temporelle capture ######
 
@@ -217,11 +217,11 @@ yield_comparison_plot <- ggplot() +
   scale_color_manual(name = element_blank(),
                      values = yield_mean_colour_palette,
                      breaks = c("observed data","mean model 1","sd model 1","mean model 2","sd model 2","mean model 3","sd model 3","mean model 4","sd model 4"),
-                     labels = c("observed data","02/02","02/02","19/13","19/13","25/03 a","25/03 a","25/03 c","25/03 c")) +
+                     labels = c("observed data","mean model 1","sd model 1","mean model 2","sd model 2","mean model 3","sd model 3","mean model 4","sd model 4")) +
   scale_fill_manual(name = element_blank(),
                     values = yield_sd_colour_palette,
                     breaks = c("sd model 1","sd model 2","sd model 3","sd model 4"),
-                    labels = c("02/02","19/03","25/03 a","25/03 c")) +
+                    labels = c("sd model 1","sd model 2","sd model 3","sd model 4")) +
   facet_wrap(~species, scales = "free_y", ncol = 4) +  # Specify ncol parameter as 4
   ylab("yield (t)") +
   theme_bw() +
@@ -229,7 +229,7 @@ yield_comparison_plot <- ggplot() +
         plot.background = element_rect(fill = "white"),
         legend.title = element_blank())
 
-ggsave(file.path("figures",results_path[3],"yield_multiple_models_2.png",sep=""), yield_comparison_plot, width = 10, height = 5, dpi=600)
+ggsave(file.path("figures",results_path[2],"yield_multiple_models.png",sep=""), yield_comparison_plot, width = 10, height = 5, dpi=600)
 
 ###### 3. Taille moyenne de capture ######
 # créer un list
