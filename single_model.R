@@ -9,8 +9,8 @@ library(viridis)
 library(RColorBrewer)
 library(gridExtra)
 # chemin pour tous les résultats
-results_path <- "calibration-05-12"
-replication_number <- 10
+results_path <- "test-05-18-3"
+replication_number <- 1
 
 ###### 1. série temporelle biomasse ######
 # charge les données d'objectif pour la calibration
@@ -91,7 +91,7 @@ biomass_comparison_plot <- ggplot(data=biomass_comparison)+
                     breaks = c("blue"),
                     labels = c("sd model outputs"))+
   facet_wrap(~species, scales = "free_y") +
-  ylab("biomass (t)")+
+  ylab("biomass (t) or biomass index")+
   theme_bw()+
   theme(axis.text.x = element_text(angle = 45, hjust = 1),
         plot.background = element_rect(fill = "white"),
@@ -145,11 +145,16 @@ ggsave(file.path("figures",results_path,"biomass_indices.png",sep=""),biomass_co
                        breaks = c("darkred", "darkblue"),
                        labels = c("observed data", "model outputs"))+
     facet_wrap(~species, scales = "free_y") +
-    ylab("biomass (t)")+
+    ylab("biomass (t) or biomass index")+
     theme_bw()+
     theme(axis.text.x = element_text(angle = 45, hjust = 1),
           plot.background = element_rect(fill = "white"),
           legend.title = element_blank())
+  
+  # force lower limit at -2 (approximation of 0 for evaluated species)
+  biomass_comparison_plot <- biomass_comparison_plot +
+    geom_blank(data = data.frame(year = unique(biomass_comparison$year), simulated = rep(-2,20)),
+               aes(x = year, y = simulated))
   
   ggsave(file.path("figures",results_path,"biomass_indices.png",sep=""),biomass_comparison_plot, width = 10, height = 5, dpi=600)
   
