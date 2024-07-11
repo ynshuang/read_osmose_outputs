@@ -857,27 +857,72 @@ ggsave(file.path("figures",results_path,"biomass_by_age_2021.png",sep=""), bioma
 
 ###### 5. Niveau trophique ######
 # 
-# trophic_path <- file.path(results_path, "Trophic/Yansong_meanTL_Simu0.csv")
-# trophic_level <- read.csv(trophic_path,skip = 1)
-# trophic_level <- tidyr::gather(trophic_level, key = "species", value = "simulated", -Time)
-# 
-# ggplot(trophic_level) + 
-#   geom_line(aes(Time,simulated)) +
-#   facet_wrap(~species) 
-# # pas de tendence observée
-# 
-# biomass_by_TL <- read.csv("calibration-12-29/Indicators/Yansong_biomassDistribByTL_Simu8.csv",skip = 1)
-# 
-# # année 2012
-# biomass_by_TL_2012 <- biomass_by_TL[biomass_by_TL$Time==11,-1]
-# biomass_by_TL_2012_long <- tidyr::gather(biomass_by_TL_2012, key = "species", value = "biomass", -TL)
-# biomass_by_TL_2012_long <- biomass_by_TL_2012_long %>%
-#   dplyr::filter(biomass > 0.1)
-# 
+trophic_path <- file.path(results_path, "Trophic/Yansong_meanTL_Simu0.csv")
+trophic_level <- read.csv(trophic_path,skip = 1)
+trophic_level <- tidyr::gather(trophic_level, key = "species", value = "simulated", -Time)
+
+ggplot(trophic_level) +
+  geom_line(aes(Time,simulated)) +
+  facet_wrap(~species)
+# pas de tendence observée
+
+biomass_by_TL <- read.csv(file.path(results_path,"Indicators/Yansong_biomassDistribByTL_Simu0.csv"),skip = 1)
+
+
+biomass_by_TL_2002 <- biomass_by_TL[biomass_by_TL$Time == 1, -1]
+biomass_by_TL_2002_long <- tidyr::gather(biomass_by_TL_2002, key = "species", value = "biomass", -TL)
+biomass_by_TL_2002_long <- biomass_by_TL_2002_long %>%
+  dplyr::filter(biomass > 0.1)
+
+# année 2012
+biomass_by_TL_2012 <- biomass_by_TL[biomass_by_TL$Time==11,-1]
+biomass_by_TL_2012_long <- tidyr::gather(biomass_by_TL_2012, key = "species", value = "biomass", -TL)
+biomass_by_TL_2012_long <- biomass_by_TL_2012_long %>%
+  dplyr::filter(biomass > 0.1)
+
+biomass_by_TL_2021 <- biomass_by_TL[biomass_by_TL$Time == 20, -1]
+biomass_by_TL_2021_long <- tidyr::gather(biomass_by_TL_2021, key = "species", value = "biomass", -TL)
+biomass_by_TL_2021_long <- biomass_by_TL_2021_long %>%
+  dplyr::filter(biomass > 0.1)
+
+# # barplot
 # ggplot(biomass_by_TL_2012_long) +
-#   geom_col(aes(TL,biomass)) + 
+#   geom_col(aes(TL,biomass)) +
 #   facet_wrap(~species, scales = "free") +
 #   xlab("Trophic Level")
+
+TL_plot_2002 <- ggplot(biomass_by_TL_2002_long, aes(x = species, y = TL, weight = biomass, group = species)) +
+  geom_violin(scale = "width") +
+  labs(x = "Species", y = "Trophic Level", title = "Trophic Level Distribution in 2002") +
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+TL_plot_2012 <- ggplot(biomass_by_TL_2012_long, aes(x = species, y = TL, weight = biomass, group = species)) +
+  geom_violin(scale = "width") +
+  labs(x = "Species", y = "Trophic Level", title = "Trophic Level Distribution in 2012") +
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+TL_plot_2021 <- ggplot(biomass_by_TL_2021_long, aes(x = species, y = TL, weight = biomass, group = species)) +
+  geom_violin(scale = "width") +
+  labs(x = "Species", y = "Trophic Level", title = "Trophic Level Distribution in 2021") +
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+ggsave(file.path("figures",results_path,"trophic_level_2002.png",sep=""),TL_plot_2002, width = 10, height = 5, dpi=600)
+ggsave(file.path("figures",results_path,"trophic_level_2012.png",sep=""),TL_plot_2012, width = 10, height = 5, dpi=600)
+ggsave(file.path("figures",results_path,"trophic_level_2021.png",sep=""),TL_plot_2021, width = 10, height = 5, dpi=600)
+
+
 
 ###### 6. Mortality ######
 # before running the code, add a word to the empty cell in each table, to prevent having ',' at the end of each line
