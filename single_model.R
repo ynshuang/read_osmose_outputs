@@ -8,9 +8,10 @@ library(dplyr)
 library(viridis)
 library(RColorBrewer)
 library(gridExtra)
+library(ncdf4)
 # chemin pour tous les résultats
-results_path <- "test-05-18-3"
-replication_number <- 1
+results_path <- "test-06-05-2"
+replication_number <- 10
 
 ###### 1. série temporelle biomasse ######
 # charge les données d'objectif pour la calibration
@@ -162,134 +163,267 @@ ggsave(file.path("figures",results_path,"biomass_indices.png",sep=""),biomass_co
   print("en cours...")
 }
 
-###### 2. série temporelle capture ######
+###### 2.1 série temporelle capture ######
 
-# données
+# Read observed data
 yield_data <- read.csv("Yansong_yield_year.csv")
+
+# Convert data from wide to long format
 yield_data_long <- gather(yield_data, key = "species", value = "yield_data", -year)
 
-if(replication_number==10)
-{# sorties du modèle
-list_yield <- list.files(results_path,"Yansong_yield_Simu.",full.names = TRUE)
-
-# define a dataframe for the yield of all species
-yield_total <- data.frame(row.names = c("year","species","yield_output_mean","yield_output_sd"))
-
-yield_total <- data.frame(
-  year = integer(), 
-  species = character(), 
-  yield_output_mean = numeric(), 
-  yield_output_sd = numeric(),
-  stringsAsFactors = FALSE
-)
-
-for (species in 1:16){
-  yield_species <- data.frame(year=c(2002:2021),species=rep("inconnu",20))
-  for (simulation in 1:10){
-    yield_brut <- read.csv(list_yield[simulation],skip = 1)
-    yield_species <- cbind(yield_species, yield = yield_brut[,species+1])
+# Define a function to process simulation outputs for each species
+process_species_yield <- function(species_idx, list_yield) {
+  # Get species name
+  species_name <- colnames(read.csv(list_yield[1], skip = 1))[species_idx + 1]
+  
+  # Create a dataframe to store species' years and simulation outputs
+  yield_species <- data.frame(year = 2002:2021, species = species_name, stringsAsFactors = FALSE)
+  
+  # Loop through each simulation result file
+  for (simulation in seq_len(replication_number)) {
+    yield_brut <- read.csv(list_yield[simulation], skip = 1)
+    
+    # Add each simulation's result to the dataframe
+    yield_species <- cbind(yield_species, yield = yield_brut[, species_idx + 1])
   }
-  # put the species name in the column
-  yield_species$species[1:20] <- colnames(yield_brut[species+1])
   
-  # calculate mean and sd among 10 simulations
-  yield_species$yield_output_mean <- rowMeans(yield_species[,3:12])
-  yield_species$yield_output_sd <- apply(yield_species[,3:12],1,sd)
+  # Calculate mean and standard deviation of simulation outputs for each species
+  colnames(yield_species) <- make.unique(colnames(yield_species))
   
-  # regroup the yield of all species
-  yield_total <- rbind(yield_total,yield_species[,c(1,2,13,14)])
+  yield_species <- yield_species %>%
+    mutate(yield_output_mean = rowMeans(select(., -c(year, species))),
+           yield_output_sd = apply(select(., -c(year, species)), 1, sd))
+  
+  # Select columns to output
+  yield_species <- yield_species %>%
+    select(year, species, yield_output_mean, yield_output_sd)
+  
+  return(yield_species)
 }
 
-# regroup the model outputs with observed data
-yield_output_data <- merge(yield_total,yield_data_long,by=c("year","species")) 
-
-# delete the species non-exploited
-yield_output_data <- yield_output_data %>%
-  dplyr::filter(!(species %in% c("poorCod","dragonet")))
-
-yield_comparison_plot <- ggplot(data=yield_output_data)+
-  geom_line(aes(x=year, y=yield_data, color = "darkred"))+
-  geom_line(aes(x=year, y = yield_output_mean,color="darkblue"))+
-  geom_ribbon(aes(x=year,
-                  ymin = ifelse(yield_output_mean - yield_output_sd>0,yield_output_mean - yield_output_sd,0),
-                  ymax = yield_output_mean + yield_output_sd,
-                  fill="blue"),
-              alpha = 0.2) +
-  scale_color_manual(name = element_blank(),
-                     values = c("darkred" = "darkred", "darkblue" = "darkblue","blue"="blue"),
-                     breaks = c("darkred", "darkblue","blue"),
-                     labels = c("observed data", "mean model outputs", "sd model outputs"))+
-  scale_fill_manual(name = element_blank(),
-                    values = c("blue"="blue"),
-                    breaks = c("blue"),
-                    labels = c("sd model outputs"))+
-  facet_wrap(~species, scales = "free_y") +
-  ylab("catch (t)")+
-  theme_bw()+
-  theme(axis.text.x = element_text(angle = 45, hjust = 1),
-        plot.background = element_rect(fill = "white"),
-        legend.margin = margin(0,1,0,1),
-        legend.title = element_blank(),
-        legend.position = c(0.7,0.04))
-
-ggsave(file.path("figures",results_path,"yield.png",sep=""), yield_comparison_plot, width = 10, height = 5, dpi=600)
-} else if (replication_number==1){
-  yield_file <- file.path(results_path,"Yansong_yield_Simu0.csv")
+# Process data based on different replication numbers
+if (replication_number > 1) {
+  # Get list of simulation output files
+  list_yield <- list.files(results_path, "Yansong_yield_Simu.", full.names = TRUE)
   
-  # define a dataframe for the yield of all species
-  yield_total <- data.frame(row.names = c("year","species","yield"))
+  # Process simulation outputs for all species
+  yield_total <- bind_rows(lapply(1:16, process_species_yield, list_yield = list_yield))
   
-  yield_total <- data.frame(
-    year = integer(),  
-    species = character(), 
-    yield = numeric()
-  )
+  # Merge simulation outputs with observed data
+  yield_output_data <- merge(yield_total, yield_data_long, by = c("year", "species")) %>%
+    filter(!species %in% c("poorCod", "dragonet")) # Filter out non-exploited species
   
-  for (species in 1:16){
-    yield_species <- data.frame(
-      year=c(2002:2021),
-      species = rep("",20), 
-      yield = rep(NA,20),
-      stringsAsFactors = FALSE
-    )
-    
-    yield_brut <- read.csv(yield_file, skip=1)
-    yield_species$yield <- yield_brut[,species+1]
-    
-    # put the species name in the column
-    yield_species$species[1:20] <- colnames(yield_brut[species+1])
-    
-    # regroup the yield of all species
-    yield_total <- rbind(yield_total,yield_species)
-  }
-  
-  # regroup the model outputs with observed data
-  yield_output_data <- cbind(yield_total,yield_data_long) 
-  # delete repeated rows
-  yield_comparison <- yield_output_data[,-c(4,5)]
-  # delete the species non-exploited
-  yield_comparison <- yield_comparison %>%
-    dplyr::filter(!(species %in% c("poorCod","dragonet")))
-  
-  yield_comparison_plot <- ggplot(data=yield_comparison)+
-    geom_point(aes(x=year, y=yield_data, color="darkred"))+
-    geom_line(aes(x=year, y=yield, color="darkblue"))+
+  # Create comparison plot
+  yield_comparison_plot <- ggplot(data = yield_output_data) +
+    geom_line(aes(x = year, y = yield_data, color = "darkred")) +
+    geom_line(aes(x = year, y = yield_output_mean, color = "darkblue")) +
+    geom_ribbon(aes(x = year,
+                    ymin = pmax(yield_output_mean - yield_output_sd, 0),
+                    ymax = yield_output_mean + yield_output_sd,
+                    fill = "blue"),
+                alpha = 0.2) +
     scale_color_manual(name = element_blank(),
                        values = c("darkred" = "darkred", "darkblue" = "darkblue"),
                        breaks = c("darkred", "darkblue"),
-                       labels = c("observed data", "model outputs"))+
+                       labels = c("observed data", "mean model outputs")) +
+    scale_fill_manual(name = element_blank(),
+                      values = c("blue" = "blue"),
+                      breaks = c("blue"),
+                      labels = c("sd model outputs")) +
     facet_wrap(~species, scales = "free_y") +
-    ylab("yield (t)")+
-    theme_bw()+
+    ylab("catch (t)") +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          plot.background = element_rect(fill = "white"),
+          legend.margin = margin(0, 1, 0, 1),
+          legend.title = element_blank(),
+          legend.position = c(0.7, 0.04))
+  
+  # Save the plot as an image file
+  ggsave(file.path("figures", results_path, "yield.png"), yield_comparison_plot, width = 10, height = 5, dpi = 600)
+  
+} else if (replication_number == 1) {
+  # Process single replication case
+  
+  # Get single simulation output file
+  yield_file <- file.path(results_path, "Yansong_yield_Simu0.csv")
+  yield_brut <- read.csv(yield_file, skip = 1)
+  
+  # Create a dataframe to store species' years and simulation outputs
+  yield_total <- data.frame(year = 2002:2021, species = character(20), yield = numeric(20))
+  
+  # Loop through each species
+  for (species in 1:16) {
+    yield_species <- data.frame(
+      year = 2002:2021,
+      species = rep("", 20), 
+      yield = yield_brut[, species + 1],
+      stringsAsFactors = FALSE
+    )
+    
+    yield_species$species <- colnames(yield_brut)[species + 1]
+    yield_total <- rbind(yield_total, yield_species)
+  }
+  
+  # Merge simulation outputs with observed data
+  yield_output_data <- merge(yield_total, yield_data_long, by = c("year", "species")) %>%
+    filter(!species %in% c("poorCod", "dragonet")) # Filter out non-exploited species
+  
+  # Create comparison plot
+  yield_comparison_plot <- ggplot(data = yield_output_data) +
+    geom_point(aes(x = year, y = yield_data, color = "darkred")) +
+    geom_line(aes(x = year, y = yield, color = "darkblue")) +
+    scale_color_manual(name = element_blank(),
+                       values = c("darkred" = "darkred", "darkblue" = "darkblue"),
+                       breaks = c("darkred", "darkblue"),
+                       labels = c("observed data", "model outputs")) +
+    facet_wrap(~species, scales = "free_y") +
+    ylab("yield (t)") +
+    theme_bw() +
     theme(axis.text.x = element_text(angle = 45, hjust = 1),
           plot.background = element_rect(fill = "white"),
           legend.title = element_blank())
   
-  ggsave(file.path("figures",results_path,"yield.png",sep=""),yield_comparison_plot, width = 10, height = 5, dpi=600)
+  # Save the plot as an image file
+  ggsave(file.path("figures", results_path, "yield.png"), yield_comparison_plot, width = 10, height = 5, dpi = 600)
   
 } else {
+  # Code for handling other cases
   print("en cours...")
 }
+
+###### 2.2 capture par flottille ######
+
+# Read observed yield data by fleet
+landing_france <- read.csv("landing_france_by_fleet.csv")
+landing_bottom_trawlers <- landing_france %>% filter(fleet=="trawlers_dem")
+landing_midwater_trawlers <- landing_france %>% filter(fleet=="trawlers_pel")
+landing_netters <- landing_france %>% filter(fleet=="netters")
+landing_others <- read.csv("landings_others.csv")
+
+
+# add species names
+species_list <- c("lesserSpottedDogfish", "redMullet", "pouting", "whiting", "poorCod", "cod", "dragonet", "sole", "plaice", "horseMackerel", "mackerel", "herring", "sardine", "squids", "cuttlefish", "thornbackRay")
+
+# 定义一个辅助函数来处理每个船队的捕捞量
+  process_species_yield_fleet <- function(species_idx, species_list,  list_yield_nc, fleet) {
+    # Get species name
+    species_name <- species_list[species_idx]
+    
+    # Create a dataframe to store species' years and simulation outputs
+    yield_species <- data.frame(year = 2002:2021, species = species_name, stringsAsFactors = FALSE)
+    
+    # Loop through each simulation result file
+    for (simulation in seq_len(replication_number)) {
+      # Open nc file and get the catch by fleet
+      catch_by_fleet <- nc_open(list_yield_nc[simulation]) %>%
+        ncvar_get(varid = "landings")
+      
+      catch_bottom_trawler <- catch_by_fleet[fleet,,] %>%
+        t() %>%
+        as.matrix() %>%
+        { array(., c(24, 20, ncol(.))) } %>%
+        apply(c(2, 3), sum)
+      
+      # Add each simulation's result to the dataframe
+      yield_species <- yield_species %>%
+        mutate(!!paste0("yield_sim_", simulation) := catch_bottom_trawler[, species_idx])
+    }
+    # 为每个物种计算模拟输出的均值和标准差
+    # colnames(yield_species) <- make.unique(colnames(yield_species))
+    
+    yield_species <- yield_species %>%
+      mutate(yield_output_mean = rowMeans(select(., -c(year, species))),
+             yield_output_sd = apply(select(., -c(year, species)), 1, sd))
+    
+    # 选择输出的列
+    yield_species <- yield_species %>%
+      select(year, species, yield_output_mean, yield_output_sd)
+    
+    return(yield_species)
+  }
+
+# Process data based on different replication numbers
+if (replication_number > 1) {
+  # Get list of simulation output files
+  list_yield_nc <- list.files(results_path, "Yansong_yieldByFishery_Simu*", full.names = TRUE)
+  
+  # Process simulation outputs for all species
+  yield_bottom_trawlers <- bind_rows(lapply(1:length(species_list), function(species_idx) {
+    process_species_yield_fleet(species_idx, species_list = species_list, list_yield_nc = list_yield_nc, fleet = 1)
+  }))
+  yield_midwater_trawlers <- bind_rows(lapply(1:length(species_list), function(species_idx) {
+    process_species_yield_fleet(species_idx, species_list = species_list, list_yield_nc = list_yield_nc, fleet = 2)
+  }))
+  yield_netters <- bind_rows(lapply(1:length(species_list), function(species_idx) {
+    process_species_yield_fleet(species_idx, species_list = species_list, list_yield_nc = list_yield_nc, fleet = 3)
+  }))
+  yield_others <- bind_rows(lapply(1:length(species_list), function(species_idx) {
+    process_species_yield_fleet(species_idx, species_list = species_list, list_yield_nc = list_yield_nc, fleet = 4)
+  }))
+  
+  # Merge simulation outputs with observed data
+  yield_bottom_trawlers_output <- left_join(yield_bottom_trawlers, landing_bottom_trawlers, by = c("year", "species")) %>%
+    filter(!species %in% c("poorCod", "dragonet")) # Filter out non-exploited species
+  yield_midwater_trawlers_output <- left_join(yield_midwater_trawlers, landing_midwater_trawlers, by = c("year", "species")) %>%
+    filter(!species %in% c("poorCod", "dragonet")) # Filter out non-exploited species
+  yield_netters_output <- left_join(yield_netters, landing_netters, by = c("year", "species")) %>%
+    filter(!species %in% c("poorCod", "dragonet")) # Filter out non-exploited species
+  yield_others_output <- left_join(yield_others, landing_others, by = c("year", "species")) %>%
+    filter(!species %in% c("poorCod", "dragonet")) # Filter out non-exploited species
+  
+  # 定义一个通用函数来创建绘图
+  create_yield_plot <- function(data, title) {
+    ggplot(data = data) +
+      geom_line(aes(x = year, y = yield_data, color = "darkred")) +
+      geom_line(aes(x = year, y = yield_output_mean, color = "darkblue")) +
+      geom_ribbon(aes(x = year,
+                      ymin = pmax(yield_output_mean - yield_output_sd, 0),
+                      ymax = yield_output_mean + yield_output_sd,
+                      fill = "blue"),
+                  alpha = 0.2) +
+      scale_color_manual(name = element_blank(),
+                         values = c("darkred" = "darkred", "darkblue" = "darkblue"),
+                         breaks = c("darkred", "darkblue"),
+                         labels = c("observed data", "mean model outputs")) +
+      scale_fill_manual(name = element_blank(),
+                        values = c("blue" = "blue"),
+                        breaks = c("blue"),
+                        labels = c("sd model outputs")) +
+      facet_wrap(~species, scales = "free_y") +
+      ylab("catch (t)") +
+      ggtitle(title) +
+      theme_bw() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1),
+            plot.background = element_rect(fill = "white"),
+            legend.margin = margin(0, 1, 0, 1),
+            legend.title = element_blank(),
+            legend.position = c(0.7, 0.04))
+  }
+  
+  # 使用通用函数生成不同船队的绘图
+  yield_bottom_trawlers_plot <- create_yield_plot(yield_bottom_trawlers_output, "Bottom Trawlers Catch")
+  yield_midwater_trawlers_plot <- create_yield_plot(yield_midwater_trawlers_output, "Midwater Trawlers Catch")
+  yield_netters_plot <- create_yield_plot(yield_netters_output, "Netters Catch")
+  yield_others_plot <- create_yield_plot(yield_others_output, "Others Catch")
+  
+  # 打印或保存图像文件
+  print(yield_bottom_trawlers_plot)
+  print(yield_midwater_trawlers_plot)
+  print(yield_netters_plot)
+  print(yield_others_plot)
+  
+  # 保存图像文件
+  ggsave(file.path("figures", results_path, "yield_bottom_trawlers.png"), yield_bottom_trawlers_plot, width = 10, height = 5, dpi = 600)
+  ggsave(file.path("figures", results_path, "yield_midwater_trawlers.png"), yield_midwater_trawlers_plot, width = 10, height = 5, dpi = 600)
+  ggsave(file.path("figures", results_path, "yield_netters.png"), yield_netters_plot, width = 10, height = 5, dpi = 600)
+  ggsave(file.path("figures", results_path, "yield_others.png"), yield_others_plot, width = 10, height = 5, dpi = 600)
+  
+} else {
+  # Code for handling other cases
+  print("en cours...")
+}
+
 
 ###### 3. Validation de courbe de croissance ######
 growth_path <- file.path(results_path,"AgeIndicators/Yansong_meanSizeDistribByAge_Simu0.csv")
@@ -435,7 +569,7 @@ ggsave(file.path("figures",results_path,"growth.png",sep=""), growth_plot, width
 #   xlim(0.7,2)
 
 
-###### 4.1 Biomasse et capture en taille ######
+###### 4.1 Capture en taille ######
 
 catch_at_length_path <- file.path(results_path,"SizeIndicators/Yansong_yieldNDistribBySize_Simu0.csv")
 catch_at_length <- read.csv(catch_at_length_path, skip = 1)
@@ -502,7 +636,7 @@ catch_at_length_2012_plot <- ggplot(catch_at_length_2012_long) +
                     breaks = "darkblue",
                     labels = "model outputs")+
   xlab("length (cm)") +
-  ylab("biomass (t)") +
+  ylab("abundance") +
   ggtitle("Catch distribution by size in 2012") +
   theme_bw()+
   theme(axis.text.x = element_text(angle = 45, hjust = 1),
@@ -525,7 +659,7 @@ catch_at_length_2021_plot <- ggplot(catch_at_length_2021_long) +
                     breaks = "darkblue",
                     labels = "model outputs")+
   xlab("length (cm)") +
-  ylab("biomass (t)") +
+  ylab("abundance") +
   ggtitle("Catch distribution by size in 2021") +
   theme_bw()+
   theme(axis.text.x = element_text(angle = 45, hjust = 1),
@@ -723,7 +857,7 @@ ggsave(file.path("figures",results_path,"biomass_by_age_2021.png",sep=""), bioma
 
 ###### 5. Niveau trophique ######
 # 
-# trophic_path <- file.path(results_path, "Trophic/Yansong_meanTL_Simu8.csv")
+# trophic_path <- file.path(results_path, "Trophic/Yansong_meanTL_Simu0.csv")
 # trophic_level <- read.csv(trophic_path,skip = 1)
 # trophic_level <- tidyr::gather(trophic_level, key = "species", value = "simulated", -Time)
 # 
@@ -745,7 +879,7 @@ ggsave(file.path("figures",results_path,"biomass_by_age_2021.png",sep=""), bioma
 #   facet_wrap(~species, scales = "free") +
 #   xlab("Trophic Level")
 
-###### 6. Mortalités ######
+###### 6. Mortality ######
 # before running the code, add a word to the empty cell in each table, to prevent having ',' at the end of each line
 mortality_path <- file.path(results_path,"Mortality")
 list_mortality <- list.files(mortality_path,"Yansong_mortalityRate.*Simu0.",full.names = TRUE)
@@ -773,7 +907,7 @@ for(species in 1:16){
   
   mortality_plot <- ggplot(mortality_long, aes(x = Year, y = mortality, fill = source)) +
     geom_bar(stat = "identity", position = "stack") +
-    facet_wrap(~ stage) + 
+    facet_wrap(~ stage, scales = "free") + 
     theme_minimal()+
     ggtitle(paste("mortality sources of",species_name[species]))+
     theme(axis.text.x = element_text(angle = 45, hjust = 1),
@@ -842,38 +976,6 @@ pred_pressure_plot <- ggplot(pred_pressure_example_long, aes(x = Year, y = Bioma
 ggsave(file.path("figures",results_path,"pred_pressure.png"), pred_pressure_plot, width = 20, height = 10, dpi=600)
 
 ###### 7.3 Diet by age ######
-# diet_by_age_path <- file.path(results_path,"/Trophic/Yansong_dietMatrixDistribByAge-whiting_Simu0.csv")
-# diet_by_age_example <- readr::read_csv(diet_by_age_path, skip = 1)
-# # transform to long format
-# diet_by_age_example_long <- diet_by_age_example %>%
-#   tidyr::pivot_longer(cols = c(3:29), names_to = "Prey", values_to = "Biomass_t")
-# # create colomn "year"
-# diet_by_age_example_long <- diet_by_age_example_long %>%
-#   dplyr::mutate(Year=Time+2001) %>%
-#   select(-Time)
-# 
-# # create colomn "year"
-# diet_by_age_example_long <- diet_by_age_example_long %>%
-#   dplyr::filter(Age <= 10)
-# 
-# # set species order
-# diet_by_age_example_long$Prey <- factor(diet_by_age_example_long$Prey, levels = unique(diet_by_age_example_long$Prey))
-# 
-# # set colour palette
-# extended_colors <- c(viridis_pal(option = "C")(16),brewer.pal(11, "Paired"))
-# 
-# diet_by_age_plot <- ggplot(diet_by_age_example_long, aes(x = Year, y = Biomass_t, fill = Prey)) +
-#   geom_bar(stat = "identity", position = "stack") +
-#   facet_wrap(~ Age) + 
-#   scale_fill_manual(values = extended_colors) +
-#   theme_minimal()+
-#   ggtitle("Diet composition by age")+
-#   theme(axis.text.x = element_text(angle = 45, hjust = 1),
-#         plot.background = element_rect(fill = "white"))
-# 
-# ggsave(file.path("figures",results_path,"diet_by_age_whiting.png"), diet_by_age_plot, width = 10, height = 5, dpi=600)
-# 
-# 
 
 # Define a list of species
 species_list <- c("lesserSpottedDogfish", "redMullet", "pouting", "whiting", "poorCod", "cod", "dragonet", "sole", "plaice", "horseMackerel", "mackerel", "herring", "sardine", "squids", "cuttlefish", "thornbackRay")
@@ -903,17 +1005,28 @@ for (i in seq_along(species_list)) {
   # Set color palette
   extended_colors <- c(viridis_pal(option = "C")(16), brewer.pal(11, "Paired"))
   
-  # Create plot
-  diet_by_age_plot <- ggplot(diet_by_age_data_long, aes(x = Year, y = Biomass_t, fill = Prey)) +
+  # diet composition as biomass
+  diet_by_age_biomass_plot <- ggplot(diet_by_age_data_long, aes(x = Year, y = Biomass_t, fill = Prey)) +
     geom_bar(stat = "identity", position = "stack") +
     facet_wrap(~ Age) + 
     scale_fill_manual(values = extended_colors) +
     theme_minimal() +
-    ggtitle(paste("Diet composition by age -", species)) +
+    ggtitle(paste("Diet composition by age (biomass) -", species)) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          plot.background = element_rect(fill = "white"))
+  
+  # diet composition as percentage
+  diet_by_age_percentage_plot <- ggplot(diet_by_age_data_long, aes(x = Year, y = Biomass_t, fill = Prey)) +
+    geom_bar(stat = "identity", position = "fill") +
+    facet_wrap(~ Age) + 
+    scale_fill_manual(values = extended_colors) +
+    theme_minimal() +
+    ggtitle(paste("Diet composition by age (biomass percentage) -", species)) +
     theme(axis.text.x = element_text(angle = 45, hjust = 1),
           plot.background = element_rect(fill = "white"))
   
   # Save plot
-  ggsave(file.path("figures", results_path, "diet_by_age", paste0("diet_by_age_", species, ".png")), diet_by_age_plot, width = 10, height = 5, dpi = 600)
+  ggsave(file.path("figures", results_path, "diet_by_age", paste0("diet_by_age_biomass", species, ".png")), diet_by_age_biomass_plot, width = 10, height = 5, dpi = 600)
+  ggsave(file.path("figures", results_path, "diet_by_age", paste0("diet_by_age_percentage", species, ".png")), diet_by_age_percentage_plot, width = 10, height = 5, dpi = 600)
 }
 
