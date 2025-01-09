@@ -9,6 +9,8 @@ library(viridis)
 library(RColorBrewer)
 library(gridExtra)
 library(ncdf4)
+library(readxl)
+
 # chemin pour tous les résultats
 results_path <- "test-06-05-2"
 replication_number <- 10
@@ -69,7 +71,7 @@ for (species in 1:16){
   biomass_total <- rbind(biomass_total,biomass_species[,c(1,2,13,14)])
 }
 
-# regroup the model outputs with observed data
+# regroup the model outputs with objective data
 biomass_output_data <- cbind(biomass_total,biomass_reference_long) 
 # delete repeated rows
 biomass_comparison <- biomass_output_data[,-c(5,6)]
@@ -83,17 +85,26 @@ biomass_comparison_plot <- ggplot(data=biomass_comparison)+
                   ymax = biomass_output_mean + biomass_output_sd,
                   fill="blue"),
               alpha = 0.2) +
-  scale_color_manual(name = element_blank(),
-                     values = c("darkred" = "darkred", "darkblue" = "darkblue","blue"="blue"),
-                     breaks = c("darkred", "darkblue","blue"),
-                     labels = c("observed data", "mean model outputs", "sd model outputs"))+
-  scale_fill_manual(name = element_blank(),
-                    values = c("blue"="blue"),
-                    breaks = c("blue"),
-                    labels = c("sd model outputs"))+
+  # 设置颜色图例
+  scale_color_manual(
+    name = element_blank(),
+    values = c("darkred" = "darkred", "darkblue" = "darkblue"),
+    breaks = c("darkred", "darkblue"),
+    labels = c("Objective data", "Mean model outputs"),
+    guide = guide_legend(order = 1) # 图例顺序1
+  ) +
+  # 设置填充图例
+  scale_fill_manual(
+    name = element_blank(),
+    values = c("blue" = "blue"),
+    breaks = c("blue"),
+    labels = c("SD model outputs"),
+    guide = guide_legend(order = 2) # 图例顺序2
+  ) +
+  # 分面
   facet_wrap(~species, scales = "free_y") +
-  ylab("biomass (t) or biomass index")+
-  theme_bw()+
+  ylab("Biomass (t) or biomass index") +
+  theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1),
         plot.background = element_rect(fill = "white"),
         legend.title = element_blank())
@@ -133,7 +144,7 @@ ggsave(file.path("figures",results_path,"biomass_indices.png",sep=""),biomass_co
     biomass_total <- rbind(biomass_total,biomass_species)
   }
   
-  # regroup the model outputs with observed data
+  # regroup the model outputs with objective data
   biomass_output_data <- cbind(biomass_total,biomass_reference_long) 
   # delete repeated rows
   biomass_comparison <- biomass_output_data[,-c(4,5)]
@@ -144,7 +155,7 @@ ggsave(file.path("figures",results_path,"biomass_indices.png",sep=""),biomass_co
     scale_color_manual(name = element_blank(),
                        values = c("darkred" = "darkred", "darkblue" = "darkblue"),
                        breaks = c("darkred", "darkblue"),
-                       labels = c("observed data", "model outputs"))+
+                       labels = c("objective data", "model outputs"))+
     facet_wrap(~species, scales = "free_y") +
     ylab("biomass (t) or biomass index")+
     theme_bw()+
@@ -165,7 +176,7 @@ ggsave(file.path("figures",results_path,"biomass_indices.png",sep=""),biomass_co
 
 ###### 2.1 série temporelle capture ######
 
-# Read observed data
+# Read objective data
 yield_data <- read.csv("Yansong_yield_year.csv")
 
 # Convert data from wide to long format
@@ -209,35 +220,51 @@ if (replication_number > 1) {
   # Process simulation outputs for all species
   yield_total <- bind_rows(lapply(1:16, process_species_yield, list_yield = list_yield))
   
-  # Merge simulation outputs with observed data
+  # Merge simulation outputs with objective data
   yield_output_data <- merge(yield_total, yield_data_long, by = c("year", "species")) %>%
     filter(!species %in% c("poorCod", "dragonet")) # Filter out non-exploited species
   
   # Create comparison plot
   yield_comparison_plot <- ggplot(data = yield_output_data) +
-    geom_line(aes(x = year, y = yield_data, color = "darkred")) +
+    # 绘制点
+    geom_point(aes(x = year, y = yield_data, color = "darkred")) +
+    # 绘制线
     geom_line(aes(x = year, y = yield_output_mean, color = "darkblue")) +
-    geom_ribbon(aes(x = year,
-                    ymin = pmax(yield_output_mean - yield_output_sd, 0),
-                    ymax = yield_output_mean + yield_output_sd,
-                    fill = "blue"),
-                alpha = 0.2) +
-    scale_color_manual(name = element_blank(),
-                       values = c("darkred" = "darkred", "darkblue" = "darkblue"),
-                       breaks = c("darkred", "darkblue"),
-                       labels = c("observed data", "mean model outputs")) +
-    scale_fill_manual(name = element_blank(),
-                      values = c("blue" = "blue"),
-                      breaks = c("blue"),
-                      labels = c("sd model outputs")) +
+    # 绘制阴影
+    geom_ribbon(aes(
+      x = year,
+      ymin = pmax(yield_output_mean - yield_output_sd, 0),
+      ymax = yield_output_mean + yield_output_sd,
+      fill = "blue"
+    ), alpha = 0.2) +
+    # 设置颜色图例
+    scale_color_manual(
+      name = element_blank(),
+      values = c("darkred" = "darkred", "darkblue" = "darkblue"),
+      breaks = c("darkred", "darkblue"),
+      labels = c("Objective data", "Mean model outputs"),
+      guide = guide_legend(order = 1) # 图例顺序1
+    ) +
+    # 设置填充图例
+    scale_fill_manual(
+      name = element_blank(),
+      values = c("blue" = "blue"),
+      breaks = c("blue"),
+      labels = c("SD model outputs"),
+      guide = guide_legend(order = 2) # 图例顺序2
+    ) +
+    # 分面
     facet_wrap(~species, scales = "free_y") +
-    ylab("catch (t)") +
+    ylab("Yield (t)") +
     theme_bw() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1),
-          plot.background = element_rect(fill = "white"),
-          legend.margin = margin(0, 1, 0, 1),
-          legend.title = element_blank(),
-          legend.position = c(0.7, 0.04))
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.background = element_rect(fill = "white"),
+      legend.margin = margin(0, 1, 0, 1),
+      legend.title = element_blank(),
+      legend.position = c(0.7, 0.04)
+    )
+  
   
   # Save the plot as an image file
   ggsave(file.path("figures", results_path, "yield.png"), yield_comparison_plot, width = 10, height = 5, dpi = 600)
@@ -265,7 +292,7 @@ if (replication_number > 1) {
     yield_total <- rbind(yield_total, yield_species)
   }
   
-  # Merge simulation outputs with observed data
+  # Merge simulation outputs with objective data
   yield_output_data <- merge(yield_total, yield_data_long, by = c("year", "species")) %>%
     filter(!species %in% c("poorCod", "dragonet")) # Filter out non-exploited species
   
@@ -276,7 +303,7 @@ if (replication_number > 1) {
     scale_color_manual(name = element_blank(),
                        values = c("darkred" = "darkred", "darkblue" = "darkblue"),
                        breaks = c("darkred", "darkblue"),
-                       labels = c("observed data", "model outputs")) +
+                       labels = c("objective data", "model outputs")) +
     facet_wrap(~species, scales = "free_y") +
     ylab("yield (t)") +
     theme_bw() +
@@ -305,7 +332,7 @@ landing_others <- read.csv("landings_others.csv")
 # add species names
 species_list <- c("lesserSpottedDogfish", "redMullet", "pouting", "whiting", "poorCod", "cod", "dragonet", "sole", "plaice", "horseMackerel", "mackerel", "herring", "sardine", "squids", "cuttlefish", "thornbackRay")
 
-# 定义一个辅助函数来处理每个船队的捕捞量
+# function for processing catch by fleet
   process_species_yield_fleet <- function(species_idx, species_list,  list_yield_nc, fleet) {
     # Get species name
     species_name <- species_list[species_idx]
@@ -329,14 +356,13 @@ species_list <- c("lesserSpottedDogfish", "redMullet", "pouting", "whiting", "po
       yield_species <- yield_species %>%
         mutate(!!paste0("yield_sim_", simulation) := catch_bottom_trawler[, species_idx])
     }
-    # 为每个物种计算模拟输出的均值和标准差
-    # colnames(yield_species) <- make.unique(colnames(yield_species))
     
+    # calculate mean and sd for each species
     yield_species <- yield_species %>%
       mutate(yield_output_mean = rowMeans(select(., -c(year, species))),
              yield_output_sd = apply(select(., -c(year, species)), 1, sd))
     
-    # 选择输出的列
+    # select colomns for output
     yield_species <- yield_species %>%
       select(year, species, yield_output_mean, yield_output_sd)
     
@@ -362,7 +388,7 @@ if (replication_number > 1) {
     process_species_yield_fleet(species_idx, species_list = species_list, list_yield_nc = list_yield_nc, fleet = 4)
   }))
   
-  # Merge simulation outputs with observed data
+  # Merge simulation outputs with objective data
   yield_bottom_trawlers_output <- left_join(yield_bottom_trawlers, landing_bottom_trawlers, by = c("year", "species")) %>%
     filter(!species %in% c("poorCod", "dragonet")) # Filter out non-exploited species
   yield_midwater_trawlers_output <- left_join(yield_midwater_trawlers, landing_midwater_trawlers, by = c("year", "species")) %>%
@@ -372,7 +398,7 @@ if (replication_number > 1) {
   yield_others_output <- left_join(yield_others, landing_others, by = c("year", "species")) %>%
     filter(!species %in% c("poorCod", "dragonet")) # Filter out non-exploited species
   
-  # 定义一个通用函数来创建绘图
+  # function for plotting
   create_yield_plot <- function(data, title) {
     ggplot(data = data) +
       geom_line(aes(x = year, y = yield_data, color = "darkred")) +
@@ -385,7 +411,7 @@ if (replication_number > 1) {
       scale_color_manual(name = element_blank(),
                          values = c("darkred" = "darkred", "darkblue" = "darkblue"),
                          breaks = c("darkred", "darkblue"),
-                         labels = c("observed data", "mean model outputs")) +
+                         labels = c("objective data", "mean model outputs")) +
       scale_fill_manual(name = element_blank(),
                         values = c("blue" = "blue"),
                         breaks = c("blue"),
@@ -401,19 +427,17 @@ if (replication_number > 1) {
             legend.position = c(0.7, 0.04))
   }
   
-  # 使用通用函数生成不同船队的绘图
+  # apply the plotting function to fleets
   yield_bottom_trawlers_plot <- create_yield_plot(yield_bottom_trawlers_output, "Bottom Trawlers Catch")
   yield_midwater_trawlers_plot <- create_yield_plot(yield_midwater_trawlers_output, "Midwater Trawlers Catch")
   yield_netters_plot <- create_yield_plot(yield_netters_output, "Netters Catch")
   yield_others_plot <- create_yield_plot(yield_others_output, "Others Catch")
   
-  # 打印或保存图像文件
   print(yield_bottom_trawlers_plot)
   print(yield_midwater_trawlers_plot)
   print(yield_netters_plot)
   print(yield_others_plot)
   
-  # 保存图像文件
   ggsave(file.path("figures", results_path, "yield_bottom_trawlers.png"), yield_bottom_trawlers_plot, width = 10, height = 5, dpi = 600)
   ggsave(file.path("figures", results_path, "yield_midwater_trawlers.png"), yield_midwater_trawlers_plot, width = 10, height = 5, dpi = 600)
   ggsave(file.path("figures", results_path, "yield_netters.png"), yield_netters_plot, width = 10, height = 5, dpi = 600)
@@ -607,7 +631,7 @@ catch_at_length_2002_plot <- ggplot(catch_at_length_2002_long) +
   scale_color_manual(name = element_blank(),
                     values = c("darkred" = "darkred"),
                     breaks = "darkred",
-                    labels = "observed data")+
+                    labels = "objective data")+
   scale_fill_manual(name = element_blank(),
                      values = c("darkblue" = "darkblue"),
                      breaks = "darkblue",
@@ -630,7 +654,7 @@ catch_at_length_2012_plot <- ggplot(catch_at_length_2012_long) +
   scale_color_manual(name = element_blank(),
                      values = c("darkred" = "darkred"),
                      breaks = "darkred",
-                     labels = "observed data")+
+                     labels = "objective data")+
   scale_fill_manual(name = element_blank(),
                     values = c("darkblue" = "darkblue"),
                     breaks = "darkblue",
@@ -653,7 +677,7 @@ catch_at_length_2021_plot <- ggplot(catch_at_length_2021_long) +
   scale_color_manual(name = element_blank(),
                      values = c("darkred" = "darkred"),
                      breaks = "darkred",
-                     labels = "observed data")+
+                     labels = "objective data")+
   scale_fill_manual(name = element_blank(),
                     values = c("darkblue" = "darkblue"),
                     breaks = "darkblue",
@@ -709,18 +733,25 @@ mean_catch_size_plot <- ggplot(mean_catch_size_comparison) +
   geom_ribbon(data = mean_catch_size_comparison, aes(x = year,
                                                      ymin = simulated_mean - simulated_sd,
                                                      ymax = simulated_mean + simulated_sd,
-                                                     fill = "sd model"),
+                                                     fill = "blue"), # 使用 "blue"
               alpha = 0.2) +
   facet_wrap(~species,scales = "free")+
-  scale_color_manual(name = element_blank(),
-                     values = c("darkred" = "darkred", "darkblue" = "darkblue","sd model"="blue" ),
-                     breaks = c("darkred", "darkblue","sd model"),
-                     labels = c("observed data", "mean model", "sd model"))+
-  scale_fill_manual(name = element_blank(),
-                    values = c("sd model"="blue"),
-                    breaks = c("sd model"),
-                    labels = c("sd model"))+
-  ylab("mean catch length (cm)")+
+  scale_color_manual(
+    name = element_blank(),
+    values = c("darkred" = "darkred", "darkblue" = "darkblue"),
+    breaks = c("darkred", "darkblue"),
+    labels = c("Objective data", "Mean model outputs"),
+    guide = guide_legend(order = 1) # 图例顺序1
+  ) +
+  # 设置填充图例
+  scale_fill_manual(
+    name = element_blank(),
+    values = c("blue" = "blue"),
+    breaks = c("blue"),
+    labels = c("SD model outputs"),
+    guide = guide_legend(order = 2) # 图例顺序2
+  ) +
+  ylab("Mean catch length (cm)")+
   theme_bw()+
   theme(axis.text.x = element_text(angle = 45, hjust = 1),
         plot.background = element_rect(fill = "white"),
@@ -861,23 +892,18 @@ trophic_path <- file.path(results_path, "Trophic/Yansong_meanTL_Simu0.csv")
 trophic_level <- read.csv(trophic_path,skip = 1)
 trophic_level <- tidyr::gather(trophic_level, key = "species", value = "simulated", -Time)
 
-ggplot(trophic_level) +
-  geom_line(aes(Time,simulated)) +
-  facet_wrap(~species)
-# pas de tendence observée
 
 biomass_by_TL <- read.csv(file.path(results_path,"Indicators/Yansong_biomassDistribByTL_Simu0.csv"),skip = 1)
-
 
 biomass_by_TL_2002 <- biomass_by_TL[biomass_by_TL$Time == 1, -1]
 biomass_by_TL_2002_long <- tidyr::gather(biomass_by_TL_2002, key = "species", value = "biomass", -TL)
 biomass_by_TL_2002_long <- biomass_by_TL_2002_long %>%
   dplyr::filter(biomass > 0.1)
 
-# année 2012
-biomass_by_TL_2012 <- biomass_by_TL[biomass_by_TL$Time==11,-1]
-biomass_by_TL_2012_long <- tidyr::gather(biomass_by_TL_2012, key = "species", value = "biomass", -TL)
-biomass_by_TL_2012_long <- biomass_by_TL_2012_long %>%
+# année 2015
+biomass_by_TL_2015 <- biomass_by_TL[biomass_by_TL$Time==14,-1]
+biomass_by_TL_2015_long <- tidyr::gather(biomass_by_TL_2015, key = "species", value = "biomass", -TL)
+biomass_by_TL_2015_long <- biomass_by_TL_2015_long %>%
   dplyr::filter(biomass > 0.1)
 
 biomass_by_TL_2021 <- biomass_by_TL[biomass_by_TL$Time == 20, -1]
@@ -885,14 +911,40 @@ biomass_by_TL_2021_long <- tidyr::gather(biomass_by_TL_2021, key = "species", va
 biomass_by_TL_2021_long <- biomass_by_TL_2021_long %>%
   dplyr::filter(biomass > 0.1)
 
-# # barplot
-# ggplot(biomass_by_TL_2012_long) +
-#   geom_col(aes(TL,biomass)) +
-#   facet_wrap(~species, scales = "free") +
-#   xlab("Trophic Level")
+cresson_2018 <- read_excel("cresson_et_al_2018.xlsx",sheet=2)
+dict_species_2018 <- c(
+  "Clupea_harengus"="herring",
+  "Trachurus_trachurus"="horseMackerel",
+  "Scomber_scombrus"="mackerel", 
+  "Sardina_pilchardus"="sardine", 
+  "Merlangius_merlangus"="whiting", 
+  "Pleuronectes_platessa"="plaice", 
+  "Solea_solea"="sole", 
+  "Sepia_officinalis"="cuttlefish", 
+  "Trisopterus_luscus"="pouting", 
+  "Mullus_surmuletus"="redMullet", 
+  "Scyliorhinus_canicula"="lesserSpottedDogfish", 
+  "Loligo_sp."="squids", 
+  "Raja_clavata"="thornbackRay", 
+  "Gadus_morhua"="cod",
+  "Callionymus_lyra"="dragonet",
+  "Trisopterus_minutus"="poorCod"
+)
 
-TL_plot_2002 <- ggplot(biomass_by_TL_2002_long, aes(x = species, y = TL, weight = biomass, group = species)) +
-  geom_violin(scale = "width") +
+cresson_2018$species <- dict_species_2018[match(cresson_2018$Science_name, names(dict_species_2018))]
+cresson_2018 <- cresson_2018 %>%
+  select("TrophLev","species") %>%
+  group_by(species) %>%
+  summarise(
+    median_TL = median(TrophLev),
+    max_TL = max(TrophLev),
+    min_TL = min(TrophLev)
+  )
+
+TL_plot_2002 <- ggplot() +
+  geom_violin(data = biomass_by_TL_2002_long, aes(x = species, y = TL, weight = biomass, group = species), scale = "width") +
+  geom_point(data = cresson_2018, aes(x = species, y = median_TL), color = "red", size = 3) +  # données
+  geom_segment(data = cresson_2018, aes(x = species, xend = species, y = min_TL, yend = max_TL), linetype = "dashed", color = "darkred") +  # 添加垂直参考线段
   labs(x = "Species", y = "Trophic Level", title = "Trophic Level Distribution in 2002") +
   theme_bw() +
   theme(
@@ -900,17 +952,21 @@ TL_plot_2002 <- ggplot(biomass_by_TL_2002_long, aes(x = species, y = TL, weight 
     axis.text.x = element_text(angle = 45, hjust = 1)
   )
 
-TL_plot_2012 <- ggplot(biomass_by_TL_2012_long, aes(x = species, y = TL, weight = biomass, group = species)) +
-  geom_violin(scale = "width") +
-  labs(x = "Species", y = "Trophic Level", title = "Trophic Level Distribution in 2012") +
+TL_plot_2015 <- ggplot() +
+  geom_violin(data = biomass_by_TL_2015_long, aes(x = species, y = TL, weight = biomass, group = species), scale = "width") +
+  geom_point(data = cresson_2018, aes(x = species, y = median_TL), color = "red", size = 3) +  # données
+  geom_segment(data = cresson_2018, aes(x = species, xend = species, y = min_TL, yend = max_TL), linetype = "dashed", color = "darkred") +  # 添加垂直参考线段
+  labs(x = "Species", y = "Trophic Level", title = "Trophic Level Distribution in 2015") +
   theme_bw() +
   theme(
     legend.position = "none",
     axis.text.x = element_text(angle = 45, hjust = 1)
   )
 
-TL_plot_2021 <- ggplot(biomass_by_TL_2021_long, aes(x = species, y = TL, weight = biomass, group = species)) +
-  geom_violin(scale = "width") +
+TL_plot_2021 <- ggplot() +
+  geom_violin(data = biomass_by_TL_2021_long, aes(x = species, y = TL, weight = biomass, group = species), scale = "width") +
+  geom_point(data = cresson_2018, aes(x = species, y = median_TL), color = "red", size = 3) +  # données
+  geom_segment(data = cresson_2018, aes(x = species, xend = species, y = min_TL, yend = max_TL), linetype = "dashed", color = "darkred") +  # 添加垂直参考线段
   labs(x = "Species", y = "Trophic Level", title = "Trophic Level Distribution in 2021") +
   theme_bw() +
   theme(
@@ -919,9 +975,8 @@ TL_plot_2021 <- ggplot(biomass_by_TL_2021_long, aes(x = species, y = TL, weight 
   )
 
 ggsave(file.path("figures",results_path,"trophic_level_2002.png",sep=""),TL_plot_2002, width = 10, height = 5, dpi=600)
-ggsave(file.path("figures",results_path,"trophic_level_2012.png",sep=""),TL_plot_2012, width = 10, height = 5, dpi=600)
+ggsave(file.path("figures",results_path,"trophic_level_2015.png",sep=""),TL_plot_2015, width = 10, height = 5, dpi=600)
 ggsave(file.path("figures",results_path,"trophic_level_2021.png",sep=""),TL_plot_2021, width = 10, height = 5, dpi=600)
-
 
 
 ###### 6. Mortality ######
@@ -1065,13 +1120,14 @@ for (i in seq_along(species_list)) {
     geom_bar(stat = "identity", position = "fill") +
     facet_wrap(~ Age) + 
     scale_fill_manual(values = extended_colors) +
+    ylab("proportion of biomass") +
     theme_minimal() +
     ggtitle(paste("Diet composition by age (biomass percentage) -", species)) +
     theme(axis.text.x = element_text(angle = 45, hjust = 1),
           plot.background = element_rect(fill = "white"))
   
   # Save plot
-  ggsave(file.path("figures", results_path, "diet_by_age", paste0("diet_by_age_biomass", species, ".png")), diet_by_age_biomass_plot, width = 10, height = 5, dpi = 600)
-  ggsave(file.path("figures", results_path, "diet_by_age", paste0("diet_by_age_percentage", species, ".png")), diet_by_age_percentage_plot, width = 10, height = 5, dpi = 600)
+  ggsave(file.path("figures", results_path, "diet_by_age", paste0("diet_by_age_biomass_", species, ".png")), diet_by_age_biomass_plot, width = 10, height = 5, dpi = 600)
+  ggsave(file.path("figures", results_path, "diet_by_age", paste0("diet_by_age_percentage_", species, ".png")), diet_by_age_percentage_plot, width = 10, height = 5, dpi = 600)
 }
 
