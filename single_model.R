@@ -451,9 +451,28 @@ if (replication_number > 1) {
 
 ###### 3. Validation de courbe de croissance ######
 growth_path <- file.path(results_path,"AgeIndicators/Yansong_meanSizeDistribByAge_Simu0.csv")
-growth_example <- read.csv(growth_path,skip = 1)
+growth_raw <- read.csv(growth_path,skip = 1)
 
-# définir le fonction de croissance Von Bertalanffy
+# 移除 Time 列
+growth_raw <- growth_raw %>% select(-Time)
+
+# 转换为长数据格式
+growth_long <- growth_raw %>%
+  pivot_longer(cols = -Age, names_to = "Species", values_to = "Length")
+
+# 计算平均值和标准差
+growth_summary <- growth_long %>%
+  group_by(Age, Species) %>%
+  summarise(
+    Mean_Length = mean(Length, na.rm = TRUE),
+    SD_Length = sd(Length, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# 年龄区间取中间
+growth_summary$Age <- growth_summary$Age +0.5
+
+####### définir la croissance Von Bertalanffy ######
 vb_SYC <- function(x) {87.42 * (1-exp(-0.118*(x+1.09)))}
 vb_MUR <- function(x) {53.3 * (1-exp(-0.18*(x+1.23)))}
 vb_BIB <- function(x) {37.6 * (1-exp(-0.46*(x+0.77)))}
@@ -473,20 +492,20 @@ vb_SQZ <- function(x) {50 * (1-exp(-2*(x-0.5)))}
 # gom_SQZ <- function(x) {78*exp(-exp(-1.764*(x-0.91)))}
 # gom2_SQZ <- function(x) {65*exp(-exp(-2.5*(x-0.7)))}
 
-age_SYC <- seq(1,10,0.1)
+age_SYC <- seq(0.5,10,0.1)
 age_MUR <- seq(1,11,0.1)
-age_BIB <- seq(1,4,0.1)
+age_BIB <- seq(0.5,4,0.1)
 age_WHG <- seq(1,20,0.1)
-age_POD <- seq(1,5,0.1)
-age_COD <- seq(1,25,0.1)
-age_LYY <- seq(1,6,0.1)
-age_SOL <- seq(1,20,0.1)
-age_PLE <- seq(1,15,0.1)
+age_POD <- seq(0.5,5,0.1)
+age_COD <- seq(0.5,25,0.1)
+age_LYY <- seq(0.5,6,0.1)
+age_SOL <- seq(0.5,20,0.1)
+age_PLE <- seq(0.5,15,0.1)
 age_HOM <- seq(1,15,0.1)
 age_MAC <- seq(1,17,0.1)
-age_HER <- seq(1,11,0.1)
-age_PIL <- seq(1,15,0.1)
-age_RJC <- seq(1,20,0.1)
+age_HER <- seq(0.5,11,0.1)
+age_PIL <- seq(0.5,15,0.1)
+age_RJC <- seq(0,20,0.1)
 # age_SQZ <- seq(0.7,2,0.1)
 # age_SQZ_gom <- seq(0.33,2,0.1)
 
@@ -507,76 +526,176 @@ length_vb_RJC <- vb_RJC(age_RJC)
 # length_vb_SQZ <- vb_SQZ(age_SQZ)
 # length_gom_SQZ <- gom_SQZ(age_SQZ)
 # length_gom2_SQZ <- gom2_SQZ(age_SQZ)
+######
 
-growth_SYC_plot <- ggplot()+
-  geom_line(aes(age_SYC,length_vb_SYC))+
-  xlim(1,10)+
-  geom_point(data=growth_example,mapping=aes(x=Age,y=lesserSpottedDogfish,colour=Time))
+growth_SYC_plot <- ggplot() +
+  geom_line(aes(age_SYC,length_vb_SYC), colour ="darkgrey") +
+  geom_line(data=growth_summary[growth_summary$Species=="lesserSpottedDogfish",],
+            mapping=aes(x=Age,y=Mean_Length)) + 
+  geom_errorbar(data=growth_summary[growth_summary$Species=="lesserSpottedDogfish",],
+                aes(x=Age,ymin = Mean_Length - SD_Length, ymax = Mean_Length + SD_Length), width = 0.2) +
+  xlim(0,10) +
+  xlab("age (y)") +
+  ylab("length (cm)") +
+  ggtitle("Lesser spotted dogfish")+
+  theme_bw()
 
 growth_MUR_plot <- ggplot()+
-  geom_line(aes(age_MUR,length_vb_MUR))+
-  xlim(1,11)+
-  geom_point(data=growth_example,mapping=aes(x=Age,y=redMullet,colour=Time))
+  geom_line(aes(age_MUR,length_vb_MUR), colour ="darkgrey") +
+  geom_line(data=growth_summary[growth_summary$Species=="redMullet",],
+            mapping=aes(x=Age,y=Mean_Length)) + 
+  geom_errorbar(data=growth_summary[growth_summary$Species=="redMullet",],
+                aes(x=Age,ymin = Mean_Length - SD_Length, ymax = Mean_Length + SD_Length), width = 0.2) +
+  xlim(0,11)+
+  xlab("age (y)") +
+  ylab("length (cm)") +
+  ggtitle("Red mullet")+
+  theme_bw()
 
 growth_BIB_plot <- ggplot()+
-  geom_line(aes(age_BIB,length_vb_BIB))+
-  xlim(1,4)+
-  geom_point(data=growth_example,mapping=aes(Age,pouting,colour=Time))
+  geom_line(aes(age_BIB,length_vb_BIB), colour ="darkgrey") +
+  geom_line(data=growth_summary[growth_summary$Species=="pouting",],
+            mapping=aes(x=Age,y=Mean_Length)) + 
+  geom_errorbar(data=growth_summary[growth_summary$Species=="pouting",],
+                aes(x=Age,ymin = Mean_Length - SD_Length, ymax = Mean_Length + SD_Length), width = 0.2) +
+  xlim(0,4)+
+  xlab("age (y)") +
+  ylab("length (cm)") +
+  ggtitle("Pouting")+
+  theme_bw()
 
 growth_WHG_plot <- ggplot()+
-  geom_line(aes(age_WHG,length_vb_WHG))+
-  xlim(1,20)+
-  geom_point(data=growth_example,mapping=aes(Age,whiting,colour=Time))
+  geom_line(aes(age_WHG,length_vb_WHG), colour ="darkgrey") +
+  geom_line(data=growth_summary[growth_summary$Species=="whiting",],
+            mapping=aes(x=Age,y=Mean_Length)) + 
+  geom_errorbar(data=growth_summary[growth_summary$Species=="whiting",],
+                aes(x=Age,ymin = Mean_Length - SD_Length, ymax = Mean_Length + SD_Length), width = 0.2) +
+  xlim(0,20)+
+  xlab("age (y)") +
+  ylab("length (cm)") +
+  ggtitle("Whiting")+
+  theme_bw()
 
 growth_POD_plot <- ggplot()+
-  geom_line(aes(age_POD,length_vb_POD))+
-  xlim(1,3)+
-  geom_point(data=growth_example,mapping=aes(Age,poorCod,colour=Time))
+  geom_line(aes(age_POD,length_vb_POD), colour ="darkgrey") +
+  geom_line(data=growth_summary[growth_summary$Species=="poorCod",],
+            mapping=aes(x=Age,y=Mean_Length)) + 
+  geom_errorbar(data=growth_summary[growth_summary$Species=="poorCod",],
+                aes(x=Age,ymin = Mean_Length - SD_Length, ymax = Mean_Length + SD_Length), width = 0.2) +
+  xlim(0,5)+
+  xlab("age (y)") +
+  ylab("length (cm)") +
+  ggtitle("Poor cod")+
+  theme_bw()
 
 growth_COD_plot <- ggplot()+
-  geom_line(aes(age_COD,length_vb_COD))+
-  xlim(1,25)+
-  geom_point(data=growth_example,mapping=aes(Age,cod,colour=Time))
+  geom_line(aes(age_COD,length_vb_COD), colour ="darkgrey") +
+  geom_line(data=growth_summary[growth_summary$Species=="cod",],
+            mapping=aes(x=Age,y=Mean_Length)) + 
+  geom_errorbar(data=growth_summary[growth_summary$Species=="cod",],
+                aes(x=Age,ymin = Mean_Length - SD_Length, ymax = Mean_Length + SD_Length), width = 0.2) +
+  xlim(0,25)+
+  xlab("age (y)") +
+  ylab("length (cm)") +
+  ggtitle("Cod")+
+  theme_bw()
 
 growth_LYY_plot <- ggplot()+
-  geom_line(aes(age_LYY,length_vb_LYY))+
-  xlim(1,6)+
-  geom_point(data=growth_example,mapping=aes(Age,dragonet,colour=Time))
+  geom_line(aes(age_LYY,length_vb_LYY), colour ="darkgrey") +
+  geom_line(data=growth_summary[growth_summary$Species=="dragonet",],
+            mapping=aes(x=Age,y=Mean_Length)) + 
+  geom_errorbar(data=growth_summary[growth_summary$Species=="dragonet",],
+                aes(x=Age,ymin = Mean_Length - SD_Length, ymax = Mean_Length + SD_Length), width = 0.2) +
+  xlim(0,6)+
+  xlab("age (y)") +
+  ylab("length (cm)") +
+  ggtitle("Dragonet")+
+  theme_bw()
 
 growth_SOL_plot <- ggplot()+
-  geom_line(aes(age_SOL,length_vb_SOL))+
-  xlim(1,20)+
-  geom_point(data=growth_example,mapping=aes(Age,sole,colour=Time))
+  geom_line(aes(age_SOL,length_vb_SOL), colour ="darkgrey") +
+  geom_line(data=growth_summary[growth_summary$Species=="sole",],
+            mapping=aes(x=Age,y=Mean_Length)) + 
+  geom_errorbar(data=growth_summary[growth_summary$Species=="sole",],
+                aes(x=Age,ymin = Mean_Length - SD_Length, ymax = Mean_Length + SD_Length), width = 0.2) +
+  xlim(0,20)+
+  xlab("age (y)") +
+  ylab("length (cm)") +
+  ggtitle("Sole")+
+  theme_bw()
 
 growth_PLE_plot <- ggplot()+
-  geom_line(aes(age_PLE,length_vb_PLE))+
-  xlim(1,15)+
-  geom_point(data=growth_example,mapping=aes(Age,plaice,colour=Time))
+  geom_line(aes(age_PLE,length_vb_PLE), colour ="darkgrey") +
+  geom_line(data=growth_summary[growth_summary$Species=="plaice",],
+            mapping=aes(x=Age,y=Mean_Length)) + 
+  geom_errorbar(data=growth_summary[growth_summary$Species=="plaice",],
+                aes(x=Age,ymin = Mean_Length - SD_Length, ymax = Mean_Length + SD_Length), width = 0.2) +
+  xlim(0,15)+
+  xlab("age (y)") +
+  ylab("length (cm)") +
+  ggtitle("Plaice")+
+  theme_bw()
 
 growth_HOM_plot <- ggplot()+
-  geom_line(aes(age_HOM,length_vb_HOM))+
-  xlim(1,15)+
-  geom_point(data=growth_example,mapping=aes(Age,horseMackerel,colour=Time))
+  geom_line(aes(age_HOM,length_vb_HOM), colour ="darkgrey") +
+  geom_line(data=growth_summary[growth_summary$Species=="horseMackerel",],
+            mapping=aes(x=Age,y=Mean_Length)) + 
+  geom_errorbar(data=growth_summary[growth_summary$Species=="horseMackerel",],
+                aes(x=Age,ymin = Mean_Length - SD_Length, ymax = Mean_Length + SD_Length), width = 0.2) +
+  xlim(0,15)+
+  xlab("age (y)") +
+  ylab("length (cm)") +
+  ggtitle("Horse mackerel")+
+  theme_bw()
 
 growth_MAC_plot <- ggplot()+
-  geom_line(aes(age_MAC,length_vb_MAC))+
-  xlim(1,17)+
-  geom_point(data=growth_example,mapping=aes(Age,mackerel,colour=Time))
+  geom_line(aes(age_MAC,length_vb_MAC), colour ="darkgrey") +
+  geom_line(data=growth_summary[growth_summary$Species=="mackerel",],
+            mapping=aes(x=Age,y=Mean_Length)) + 
+  geom_errorbar(data=growth_summary[growth_summary$Species=="mackerel",],
+                aes(x=Age,ymin = Mean_Length - SD_Length, ymax = Mean_Length + SD_Length), width = 0.2) +
+  xlim(0,17)+
+  xlab("age (y)") +
+  ylab("length (cm)") +
+  ggtitle("Mackerel")+
+  theme_bw()
 
 growth_HER_plot <- ggplot()+
-  geom_line(aes(age_HER,length_vb_HER))+
-  xlim(1,11)+
-  geom_point(data=growth_example,mapping=aes(Age,herring,colour=Time))
+  geom_line(aes(age_HER,length_vb_HER), colour ="darkgrey") +
+  geom_line(data=growth_summary[growth_summary$Species=="herring",],
+            mapping=aes(x=Age,y=Mean_Length)) + 
+  geom_errorbar(data=growth_summary[growth_summary$Species=="herring",],
+                aes(x=Age,ymin = Mean_Length - SD_Length, ymax = Mean_Length + SD_Length), width = 0.2) +
+  xlim(0,11)+
+  xlab("age (y)") +
+  ylab("length (cm)") +
+  ggtitle("Herring")+
+  theme_bw()
 
 growth_PIL_plot <- ggplot()+
-  geom_line(aes(age_PIL,length_vb_PIL))+
-  xlim(1,15)+
-  geom_point(data=growth_example,mapping=aes(Age,sardine,colour=Time))
+  geom_line(aes(age_PIL,length_vb_PIL), colour ="darkgrey") +
+  geom_line(data=growth_summary[growth_summary$Species=="sardine",],
+            mapping=aes(x=Age,y=Mean_Length)) + 
+  geom_errorbar(data=growth_summary[growth_summary$Species=="sardine",],
+                aes(x=Age,ymin = Mean_Length - SD_Length, ymax = Mean_Length + SD_Length), width = 0.2) +
+  xlim(0,15)+
+  xlab("age (y)") +
+  ylab("length (cm)") +
+  ggtitle("Sardine")+
+  theme_bw()
 
 growth_RJC_plot <- ggplot()+
-  geom_line(aes(age_RJC,length_vb_RJC))+
-  xlim(1,20)+
-  geom_point(data=growth_example,mapping=aes(Age,thornbackRay,colour=Time))
+  geom_line(aes(age_RJC,length_vb_RJC), colour ="darkgrey") +
+  geom_line(data=growth_summary[growth_summary$Species=="thornbackRay",],
+            mapping=aes(x=Age,y=Mean_Length)) + 
+  geom_errorbar(data=growth_summary[growth_summary$Species=="thornbackRay",],
+                aes(x=Age,ymin = Mean_Length - SD_Length, ymax = Mean_Length + SD_Length), width = 0.2) +
+  xlim(0,20)+
+  xlab("age (y)") +
+  ylab("length (cm)") +
+  ggtitle("Thornback ray")+
+  theme_bw()
+
 
 growth_plot <- ggpubr::ggarrange(growth_SYC_plot,growth_MUR_plot,growth_BIB_plot,
                   growth_WHG_plot,growth_POD_plot,growth_COD_plot,
@@ -1027,6 +1146,21 @@ diet_example_long <- diet_example %>%
 diet_example_long <- diet_example_long %>%
   dplyr::mutate(Year=Time+2001) %>%
   select(-Time)
+
+diet_example_long$Prey <- recode(
+  diet_example_long$Prey,
+  "diatoms" = "phytoplankton",
+  "microPhytoplankton" = "phytoplankton",
+  "heterotrophicFlagellates" = "zooplankton",
+  "microZooplankton" = "zooplankton",
+  "mesoZooplankton" = "zooplankton",
+  "Macrozoo" = "zooplankton",
+  "meioBenthos" = "benthos",
+  "depositBenthos" = "benthos",
+  "suspensionBenthos" = "benthos",
+  "largeBenthos" = "benthos",
+  "veryLargeBenthos" = "benthos"
+)
 
 # set species order
 diet_example_long$Prey <- factor(diet_example_long$Prey, levels = unique(diet_example_long$Prey))
