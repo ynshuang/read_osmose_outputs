@@ -1229,39 +1229,60 @@ for (i in seq_along(species_list)) {
   # Transform to long format
   diet_by_age_data_long <- diet_by_age_data %>%
     pivot_longer(cols = c(3:29), names_to = "Prey", values_to = "Biomass_t") %>%
-    mutate(Year = Time + 2001) %>%
-    select(-Time) %>%
     filter(Age <= life_span)
+  
+  diet_by_age_data_long$Prey <- recode(
+    diet_by_age_data_long$Prey,
+    "diatoms" = "phytoplankton",
+    "microPhytoplankton" = "phytoplankton",
+    "heterotrophicFlagellates" = "zooplankton",
+    "microZooplankton" = "zooplankton",
+    "mesoZooplankton" = "zooplankton",
+    "Macrozoo" = "zooplankton",
+    "meioBenthos" = "benthos",
+    "depositBenthos" = "benthos",
+    "suspensionBenthos" = "benthos",
+    "largeBenthos" = "benthos",
+    "veryLargeBenthos" = "benthos"
+  )
   
   # Set Prey column order
   diet_by_age_data_long$Prey <- factor(diet_by_age_data_long$Prey, levels = unique(diet_by_age_data_long$Prey))
   
-  # Set color palette
-  extended_colors <- c(viridis_pal(option = "C")(16), brewer.pal(11, "Paired"))
+  # 计算平均值
+  diet_by_age_summary <- diet_by_age_data_long %>%
+    group_by(Age, Prey) %>%
+    summarise(
+      Mean_biomass = mean(Biomass_t, na.rm = TRUE),
+      .groups = "drop"
+    )
   
-  # diet composition as biomass
-  diet_by_age_biomass_plot <- ggplot(diet_by_age_data_long, aes(x = Year, y = Biomass_t, fill = Prey)) +
-    geom_bar(stat = "identity", position = "stack") +
-    facet_wrap(~ Age) + 
-    scale_fill_manual(values = extended_colors) +
-    theme_minimal() +
-    ggtitle(paste("Diet composition by age (biomass) -", species)) +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1),
-          plot.background = element_rect(fill = "white"))
+  # Set color palette
+  # extended_colors <- c(viridis_pal(option = "C")(16), brewer.pal(11, "Paired"))
+  extended_colors <- c(brewer.pal(12, "Set3"),brewer.pal(8, "Dark2"))
+  
+  # diet composition as absolute biomass
+  # diet_by_age_biomass_plot <- ggplot(diet_by_age_summary, aes(x = Age, y = Mean_biomass, fill = Prey)) +
+  #   geom_bar(stat = "identity", position = "stack") +
+  #   scale_fill_manual(values = extended_colors) +
+  #   theme_minimal() +
+  #   ggtitle(paste("Diet composition by age -", species)) +
+  #   theme(axis.text.x = element_text(angle = 45, hjust = 1),
+  #         plot.background = element_rect(fill = "white"))
   
   # diet composition as percentage
-  diet_by_age_percentage_plot <- ggplot(diet_by_age_data_long, aes(x = Year, y = Biomass_t, fill = Prey)) +
+  diet_by_age_percentage_plot <- ggplot(diet_by_age_summary, aes(x = Age, y = Mean_biomass, fill = Prey)) +
     geom_bar(stat = "identity", position = "fill") +
-    facet_wrap(~ Age) + 
     scale_fill_manual(values = extended_colors) +
+    scale_x_continuous(breaks = seq(min(diet_by_age_summary$Age), max(diet_by_age_summary$Age), by = 1))+
     ylab("proportion of biomass") +
     theme_minimal() +
-    ggtitle(paste("Diet composition by age (biomass percentage) -", species)) +
+    ggtitle(paste("Diet composition by age -", species)) +
     theme(axis.text.x = element_text(angle = 45, hjust = 1),
           plot.background = element_rect(fill = "white"))
   
   # Save plot
-  ggsave(file.path("figures", results_path, "diet_by_age", paste0("diet_by_age_biomass_", species, ".png")), diet_by_age_biomass_plot, width = 10, height = 5, dpi = 600)
+  # ggsave(file.path("figures", results_path, "diet_by_age", paste0("diet_by_age_biomass_", species, ".png")), diet_by_age_biomass_plot, width = 10, height = 5, dpi = 600)
   ggsave(file.path("figures", results_path, "diet_by_age", paste0("diet_by_age_percentage_", species, ".png")), diet_by_age_percentage_plot, width = 10, height = 5, dpi = 600)
 }
 
